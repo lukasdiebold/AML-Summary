@@ -165,3 +165,33 @@ $$
 This is exactly the result we obtained in Act 3 for kernel regression. 
 
 \textbf{Conclusion:} Gradient descent on a very wide neural network operates in a \textit{kernel regime}, where training is equivalent to kernel ridge regression with the neural tangent kernel. The NTK is determined by the architecture and activation function, but the solution has the same closed-form structure $k(x_*)^{\top} K^{-1} y$ as any other kernel method. In practice, finite-width networks can escape this regime and learn richer, feature-learning representations—this lazy limit is a useful theoretical baseline.
+
+\subsection{Some Things from the Slides}
+
+\paragraph{MAP, ERM, and the conditional mean.} For squared loss and any hypothesis class rich enough to contain the regression function, the Bayes-optimal solution is the conditional expectation $f^\star(x) = \mathbb{E}[Y \mid X = x]$, i.e.
+\[
+f^\star \in \arg\min_f \mathbb{E}_{X,Y}\left[(Y - f(X))^2\right].
+\]
+In practice $P(Y \mid X)$ is unknown, so we either (i) postulate a parametric model and perform maximum likelihood / MAP (e.g., assume $Y \mid X \sim \mathcal{N}(f_\beta(X), \sigma^2)$ and maximize $\sum_i \log p(y_i \mid x_i, \beta)$) or (ii) minimize the empirical risk $\sum_i (y_i - f(x_i))^2$ directly. For well-behaved models these two routes coincide, which explains why classical ERM with squared loss reproduces the MAP estimator of a Gaussian noise model.
+
+\paragraph{Gauss–Markov optimality.} Ordinary least squares does not merely give \emph{a} solution, it gives the best linear unbiased estimator (BLUE). Consider any linear estimator $\tilde{\theta} = c^\top y$ that is unbiased for $a^\top \beta$ (i.e., $\mathbb{E}[\tilde{\theta}] = a^\top \beta$). The Gauss–Markov theorem states
+\[
+\operatorname{Var}(a^\top \hat{\beta}) \leq \operatorname{Var}(\tilde{\theta}),
+\]
+where $\hat{\beta} = (X^\top X)^{-1}X^\top y$ is the OLS solution and $a$ is an arbitrary vector. Intuitively, any other unbiased linear estimator differs from OLS by an additive linear operator $D$ with $a^\top D X = 0$, which only inflates variance through the positive semi-definite term $D D^\top$. This reinforces the motivation for OLS (or its regularized cousins) when unbiasedness and linearity are desired.
+
+\paragraph{Bias–variance decomposition.} Suppose we highlight a specific input $x$ and view the learned regressor $\hat{f}$ as a random variable (due to sampling various training sets). The expected squared prediction error decomposes into variance, bias, and irreducible noise:
+\[
+\mathbb{E}_D \mathbb{E}_{Y|X=x}\left[(\hat{f}(x) - Y)^2\right]
+= \underbrace{\mathbb{E}_D\left[(\hat{f}(x) - \mathbb{E}_D[\hat{f}(x)])^2\right]}_{\text{variance}}
++ \underbrace{\left(\mathbb{E}_D[\hat{f}(x)] - \mathbb{E}[Y \mid X = x]\right)^2}_{\text{bias}^2}
++ \underbrace{\operatorname{Var}(Y \mid X = x)}_{\text{noise}}.
+\]
+Low-capacity models (small hypothesis classes) produce high bias and low variance, while expressive models produce the opposite. Managing this trade-off is the crux of regularization and model selection.
+
+\paragraph{Shrinkage beyond ridge and lasso.} Ridge ($\ell_2$) and lasso ($\ell_1$) penalties are instances of a broader shrinkage family
+\[
+\hat{\beta} = \arg\min_{\beta} \sum_{i=1}^n \left(y_i - \beta_0 - \sum_{j=1}^d x_{i,j}\beta_j\right)^2 + \lambda \sum_{j=1}^d |\beta_j|^q,\quad q \in (0, \infty].
+\]
+Varying $q$ changes the geometry of the constraint set: $q=2$ yields spherical ridge contours, $q=1$ produces diamond-shaped lasso constraints whose corners encourage sparsity, and $q<1$ (non-convex) promotes even stronger sparsity at the cost of more difficult optimization. These shrinkage priors can be interpreted as MAP estimators with different prior distributions on $\beta$ (Gaussian, Laplace, etc.) and help calibrate the bias–variance compromise by shrinking noisy coefficients toward zero.
+In practice we trace the coefficient paths as the tuning parameter (either $\lambda$ or the effective degrees of freedom) varies, and select the desired amount of shrinkage via cross-validation on held-out data. Ridge paths shrink smoothly without hitting zero, whereas lasso paths \emph{do} cross zero, enabling feature selection alongside regularization.
