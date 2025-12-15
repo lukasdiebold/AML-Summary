@@ -61,3 +61,68 @@ where $\beta_* \in \mathbb{R}^{\infty}$ and
 $$
 \varphi(X)=K_x\left(\frac{x_1^{\alpha_1} ... x_d^{\alpha_d}}{\sqrt{\alpha_{1}!\ldots \alpha_{d}!}}\right)_{\alpha \in \mathbb{N}^d}
 $$
+Then for $x, x^{\prime} \in \mathbb{R}^a$
+$$
+\begin{aligned}
+\varphi(x)^{\top} \varphi\left(x^{\prime}\right) & =K_{RBF}\left(x, x^{\prime}\right) \\
+& =\exp \left(-\frac{1}{2} ||x-x^{\prime} ||^2\right)
+\end{aligned}$$
+and 
+$$
+\begin{aligned}
+\hat{\beta} & =\arg \min _{\beta \in \mathbb{R}^{\infty}} \frac{1}{n} \sum_{i \leq n}\left(y_i-\varphi\left(x_i\right)^{\top} \beta\right)^2 \\
+& =\Phi^{\top}\left(\Phi \Phi^{\top}\right)^{-1} y
+\end{aligned}
+$$
+where 
+$$
+\Phi=\left[\begin{array}{l}
+\varphi(x)^{\top}  \\
+\varphi\left(x_2\right)^{\top}\\
+\varphi\left(x_n\right)^{\top}
+\end{array}\right] \in \mathbb R^{n \times \infty}
+$$
+This doesn't look good. But let $x_*$ be a test point. Then
+$$
+\begin{aligned}
+x_x & =\varphi\left(x_*\right)^{\top} \hat{\beta} \\
+& =\varphi\left(x_*\right)^{\top} \Phi^{\top}\left(\Phi \Phi^{\top}\right)^{-1}\\
+&= k(x_*) K
+\end{aligned}
+$$
+where $k(x_*) = \left(\varphi\left(x_*\right)^{\top} \varphi\left(x_i\right)\right)_{1 \leq n}$ and $K_{ij}=\left(\varphi(x_i)^{\top} \varphi(x_j)\right)$
+
+The problem is that the inversion of the matrix is $O(n^3)$, which is a problem if our data are too high-dimensional.
+
+\subsection{Act 4: Neural Networks}
+We assume $f_*$ has only a single, very wide hidden layer.
+$$f_*(X)=\frac{1}{\sqrt{m}} \sum_{i \leq m} \alpha_i \phi\left(\omega_i^{\top} X\right)$$
+then $\theta=\left\{\alpha_i, w_i\right\}_{i \leq m}$. We use gradient descent. We initialize our NN with
+$$
+\left.\theta_0 \sim N\left(0, w^2\right]\right)
+$$
+and we update our parameters using gradient descent. 
+$$
+\left.\theta_{t+1} \leftarrow \theta_t-\eta \nabla_0 \text { MSE(D, } \theta_t\right)
+$$
+and we can calculate
+$$\nabla_\theta \operatorname{MSE}\left(D, \theta_t\right)=\widetilde{\Phi}_t^{\top}\left(f_t-y\right)$$
+where 
+$$
+\tilde{\Phi}_t=\left(-\nabla_0 f\left(x ; \theta_t\right)^\top-\right)_{i \leq n} \text{ and } f_t=(f(x ; \theta_t))_{i \in n}
+$$
+If we approximate $f_t$ using a first order taylor approximation
+$$f_t \approx t_0+\tilde \Phi\left(\theta_t-\theta_0\right)$$
+then
+$$
+\theta_t-\theta_0=\Phi^{\top}\left(\tilde{\Phi} \tilde{\Phi}^{\top}\right)^{-1}\left(f_t-f_0\right)
+$$
+Then let $x_*$ be a test point
+$$
+f_t\left(x_t\right) \approx f_0\left(x_k\right)+\nabla f\left(x_t, \theta_t\right)^{\top} \tilde{\Phi_t}^{\top}\left(\Phi_t \tilde{\Phi_t}^{\top}\right)^{-1}\left(f_t-f_0\right)
+$$
+if we then let $t$ and $m$ go $\infty$, this turns into
+$$
+f_t\left(x_t\right) \ = 0+\widetilde{K}\left(x_*\right)^{\top} K^{-1}(y-0)=k\left(x_*\right)^{\top} K^{-1} y
+$$
+This is exactly the result we also had at the end of act 3. \textbf{So gradient descent with NN is just simulating kernelized ridge-regression, except that we are using a different kernel.}
