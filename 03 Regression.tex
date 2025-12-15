@@ -1,11 +1,11 @@
 \section{Regression}
-\subsection{Act 1: High Dimensional regression is unstable}
+\subsection{Act 1: High-dimensional regression is unstable}
 
 we assume X and y are distributed according to a distribution $p_*$ (i.e. $X, y \sim p_*$) and 
 $$
 y = f_*(x) + \varepsilon \quad \text{with } \varepsilon \sim \mathcal N(0, \sigma)
 $$
-Then our task ist to estimage $f_*$ from $D = \{x_i, y_i\} \sim p_*$. The problem in this form isn't tractable, this is why we restrict the choice of functions. First we choose the limit ourselfs to linear functions, that is function of the form 
+Then our task is to estimate $f_*$ from $D = \{x_i, y_i\} \sim p_*$. The problem in this form is not tractable, this is why we restrict the choice of functions. First we limit ourselves to linear functions, that is functions of the form 
 $$f_*(x) = \beta^\top x$$
 This problem we then solve using Maximum Likelihood Estimation (MLE), that is
 $$
@@ -31,16 +31,16 @@ y_1 \\
 y_n
 \end{array}\right]
 $$
-This estimator has some interesting properties. It is unbiased and has the minimal variance for all unbiased estimators (Gauss-Markov Theorem). % TODO what is this
+This estimator has some interesting properties. It is unbiased and, by the Gauss-Markov Theorem, it is the best linear unbiased estimator (BLUE), i.e. it attains the smallest variance among all linear unbiased estimators.
 Thus, from the formula
 $$
 \text{error} = \text{bias}^2 + \text{variance} + \text{noise}
 $$
-we find that this estimator is the one with the smallest error of all the unbiased estimators. Then why does no-one use this estimator, this is because if we introduce a bit of bias, we can significantly reduce the variance. So what is the variance of $\text{Var}(\hat b)$? For this we use the SVD of $X = UDV^\top$ if we plug this into the formula from above we get
+we find that this estimator is the one with the smallest error of all the unbiased estimators. Then why does no-one use this estimator? If we introduce a bit of bias, we can significantly reduce the variance. So what is $\operatorname{Var}(\hat b)$? For this we use the SVD of $X = UDV^\top$; if we plug this into the formula from above we get
 $$\hat b = VD^{-1}U^\top y$$
 so, since $y$ has a gaussian distribution and we just multiply it with a matrix ($VD^{-1}U^\top$), $\hat b$ also has a gaussian distribution. Then
 $$\operatorname{Var}(\hat{\beta})=\ldots=\sigma^2 V D^{-2} V^{\top} =\sigma^2 \sum_{i \leq n} \frac{1}{D_{ii}^2} V_i V_i^{\top} $$
-What are the implications of this? If we are working with high dimensional data, many of these features are typically correlated, this means that $X$ has a low rank, then the smallest $D_{ii}$ values are very small, which means that the bias is huge. 
+What are the implications of this? In high-dimensional data many features are correlated, so $X$ is close to low rank and several singular values $D_{ii}$ are tiny. The $1/D_{ii}^2$ factors then explode, making the variance (and with it prediction instability) very large, even though the estimator remains unbiased. 
 
 \subsection{Act 2: Stability via Regularization}
 The typical process of \textbf{Bayesian inference} goes through the follwing stages:
@@ -49,12 +49,12 @@ The typical process of \textbf{Bayesian inference} goes through the follwing sta
     \item Observe likelihood $p(D | \beta)$
     \item Posterior \textit{(adjustment of the likelihood)} $p(\beta | D) \propto p(\beta) p(D | \beta) \propto \exp \left(-\frac{1}{2 \sigma^2} \text{MSE}(D, \beta)-\frac{1}{2 \tau^2}\|\beta\|^2\right)$
 \end{enumerate}
-Observe that the last term is equivalent to the loss induced by the \textbf{Ridge}-Regression. (If we change $\beta$ to have a Laplace distribution (heavy tails), we get \textbf{Lasso}-Regression) By adjusting $\tau$ we can adjust the bias-variance tradeoff. If we do the math we get
+Observe that the last term is equivalent to the loss induced by \textbf{ridge regression}. With a Laplace prior (heavy tails) on $\beta$ we obtain \textbf{lasso} instead. The prior variance $\tau^2$ controls the amount of shrinkage and therefore the bias-variance trade-off. If we do the math we get
 $$\hat{\beta}_{\text {MAP }}=\left(x^{\top} x+\frac{\sigma^2}{\tau^2} I\right)^{-1} x^{\top} y$$ and if we do again an SVD to calculate the variance we get
 $$\text{Var}(\hat \beta_{\text {MAP }}) = \sigma^2 \sum_{i\leq n} \frac{D_{ii}^2}{\left(D_i^2+\frac{\sigma_i^2}{\tau^2}\right)} V_i V_i^{\top}$$
-So we can use $\tau$ to control the whole fraction term, which is an improvement to the situation we had before. 
+Compared to OLS, the shrinkage factor $\frac{D_{ii}^2}{D_i^2+\sigma_i^2/\tau^2}$ down-weights directions with small singular values, reducing variance at the cost of introducing bias. 
 
-\subsection{Act 3: Polynomial regression via }
+\subsection{Act 3: Polynomial regression via kernels}
 Now we change our assumption for $f_*(x)$ so that it is a polynomial function on $x$. We have
 $$f_*(x) = \varphi(x)^\top \beta _*$$
 where $\beta_* \in \mathbb{R}^{\infty}$ and 
@@ -85,44 +85,56 @@ $$
 This doesn't look good. But let $x_*$ be a test point. Then
 $$
 \begin{aligned}
-x_x & =\varphi\left(x_*\right)^{\top} \hat{\beta} \\
-& =\varphi\left(x_*\right)^{\top} \Phi^{\top}\left(\Phi \Phi^{\top}\right)^{-1}\\
-&= k(x_*) K
+\hat y_* & =\varphi\left(x_*\right)^{\top} \hat{\beta} \\
+& =\varphi\left(x_*\right)^{\top} \Phi^{\top}\left(\Phi \Phi^{\top}\right)^{-1} y\\
+&= k(x_*)^{\top} K^{-1} y
 \end{aligned}
 $$
-where $k(x_*) = \left(\varphi\left(x_*\right)^{\top} \varphi\left(x_i\right)\right)_{1 \leq n}$ and $K_{ij}=\left(\varphi(x_i)^{\top} \varphi(x_j)\right)$
+where $k(x_*) = \left(\varphi\left(x_*\right)^{\top} \varphi\left(x_i\right)\right)_{1 \leq i \leq n}$ and $K_{ij}=\left(\varphi(x_i)^{\top} \varphi(x_j)\right)$. This is the kernel trick: we only need inner products via $K$, not the infinite-dimensional $\varphi(\cdot)$.
 
-The problem is that the inversion of the matrix is $O(n^3)$, which is a problem if our data are too high-dimensional.
+The problem is that the inversion of the matrix is $O(n^3)$, which becomes costly for large datasets even though we avoided the infinite feature map explicitly.
 
 \subsection{Act 4: Neural Networks}
 We assume $f_*$ has only a single, very wide hidden layer.
 $$f_*(X)=\frac{1}{\sqrt{m}} \sum_{i \leq m} \alpha_i \phi\left(\omega_i^{\top} X\right)$$
-then $\theta=\left\{\alpha_i, w_i\right\}_{i \leq m}$. We use gradient descent. We initialize our NN with
+where $\phi$ is a nonlinear activation function (e.g. ReLU, tanh), and the network has $m$ hidden units. The parameters are $\theta=\left\{\alpha_i, w_i\right\}_{i \leq m}$, i.e. both the output weights $\alpha_i$ and the input weights $w_i$ are learned. We initialize with
 $$
-\left.\theta_0 \sim N\left(0, w^2\right]\right)
+\theta_0 \sim \mathcal N\left(0, w^2\right)
 $$
 and we update our parameters using gradient descent. 
 $$
-\left.\theta_{t+1} \leftarrow \theta_t-\eta \nabla_0 \text { MSE(D, } \theta_t\right)
+\theta_{t+1} \leftarrow \theta_t-\eta \nabla_\theta \text { MSE}(D, \theta_t)
 $$
-and we can calculate
+The gradient can be written in matrix form as
 $$\nabla_\theta \operatorname{MSE}\left(D, \theta_t\right)=\widetilde{\Phi}_t^{\top}\left(f_t-y\right)$$
 where 
 $$
-\tilde{\Phi}_t=\left(-\nabla_0 f\left(x ; \theta_t\right)^\top-\right)_{i \leq n} \text{ and } f_t=(f(x ; \theta_t))_{i \in n}
+\tilde{\Phi}_t=\left(-\nabla_\theta f\left(x_i ; \theta_t\right)^\top-\right)_{i \leq n} \in \mathbb{R}^{n \times |\theta|} \quad \text{ and } \quad f_t=\left(f(x_i ; \theta_t)\right)_{i \leq n} \in \mathbb{R}^n
 $$
-If we approximate $f_t$ using a first order taylor approximation
-$$f_t \approx t_0+\tilde \Phi\left(\theta_t-\theta_0\right)$$
-then
+Here $\tilde{\Phi}_t$ is the feature matrix whose $i$-th row is the gradient of the network output with respect to all parameters, evaluated at data point $x_i$ and current parameters $\theta_t$.
+
+In the \textit{lazy training regime} (small learning rate, wide network), the parameters stay close to initialization, so we can linearize the network via a first-order Taylor expansion around $\theta_0$:
+$$f_t \approx f_0+\tilde \Phi_0\left(\theta_t-\theta_0\right)$$
+Assuming the feature matrix $\tilde{\Phi}_t$ remains approximately constant at $\tilde{\Phi}_0$ (which holds when $m \to \infty$), gradient flow yields
 $$
-\theta_t-\theta_0=\Phi^{\top}\left(\tilde{\Phi} \tilde{\Phi}^{\top}\right)^{-1}\left(f_t-f_0\right)
+\theta_t-\theta_0=\tilde{\Phi}_0^{\top}\left(\tilde{\Phi}_0 \tilde{\Phi}_0^{\top}\right)^{-1}\left(f_t-f_0\right)
 $$
-Then let $x_*$ be a test point
+This says the parameter change lies in the span of the gradients and is chosen to optimally fit the training residuals.
+
+Now let $x_*$ be a test point. Plugging the linearization into the prediction yields
 $$
-f_t\left(x_t\right) \approx f_0\left(x_k\right)+\nabla f\left(x_t, \theta_t\right)^{\top} \tilde{\Phi_t}^{\top}\left(\Phi_t \tilde{\Phi_t}^{\top}\right)^{-1}\left(f_t-f_0\right)
+f_t\left(x_*\right) \approx f_0\left(x_*\right)+\nabla_\theta f\left(x_*, \theta_0\right)^{\top} \tilde{\Phi}_0^{\top}\left(\tilde{\Phi}_0 \tilde{\Phi}_0^{\top}\right)^{-1}\left(f_t-f_0\right)
 $$
-if we then let $t$ and $m$ go $\infty$, this turns into
+Define the \textit{neural tangent kernel (NTK)} $K$ with entries
 $$
-f_t\left(x_t\right) \ = 0+\widetilde{K}\left(x_*\right)^{\top} K^{-1}(y-0)=k\left(x_*\right)^{\top} K^{-1} y
+K_{ij} = \nabla_\theta f(x_i, \theta_0)^{\top} \nabla_\theta f(x_j, \theta_0) = \left[\tilde{\Phi}_0 \tilde{\Phi}_0^{\top}\right]_{ij}
 $$
-This is exactly the result we also had at the end of act 3. \textbf{So gradient descent with NN is just simulating kernelized ridge-regression, except that we are using a different kernel.}
+and similarly $k(x_*) = \left(\nabla_\theta f(x_*, \theta_0)^{\top} \nabla_\theta f(x_i, \theta_0)\right)_{i \leq n}$. 
+
+In the infinite-width limit ($m \to \infty$), the random initialization ensures $f_0(x) \to 0$ for all $x$ (the outputs average out), and after infinite training time ($t \to \infty$), gradient descent drives the training residual to zero so $f_t \to y$. The prediction becomes
+$$
+f_\infty\left(x_*\right) = k\left(x_*\right)^{\top} K^{-1} y
+$$
+This is exactly the result we obtained in Act 3 for kernel regression. 
+
+\textbf{Conclusion:} Gradient descent on a very wide neural network operates in a \textit{kernel regime}, where training is equivalent to kernel ridge regression with the neural tangent kernel. The NTK is determined by the architecture and activation function, but the solution has the same closed-form structure $k(x_*)^{\top} K^{-1} y$ as any other kernel method. In practice, finite-width networks can escape this regime and learn richer, feature-learning representations—this lazy limit is a useful theoretical baseline.
