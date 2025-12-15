@@ -1,0 +1,76 @@
+\section{Representations}
+
+Machine learning algorithms only see the world through the representations we choose. Good representations clarify the objective (expected risk), guide the empirical procedures we rely on (empirical risk and test evaluation), and encode the structure of the data via adequate feature, scale, and mathematical spaces.
+
+\subsection{Expected vs.\ empirical risk}
+Given a hypothesis $f \in \mathcal{C}$, a loss function $Q$ and random variables $(X, Y)$, the conditional expected risk is
+\[
+R(f, X) = \int Q(Y, f(X))\, \mathbb P(Y \mid X)\, dY,
+\]
+while the total expected risk integrates over the data distribution
+\[
+R(f) = \int R(f, X)\, \mathbb P(X)\, dX = \iint Q(Y, f(X))\, \mathbb P(X, Y)\, dX\, dY.
+\]
+Learning is phrased as minimizing $R(f)$, but we only have data. With a training sample $Z_{\mathrm{train}} = \{(X_i, Y_i)\}_{i=1}^n$, the empirical risk (training error) of an estimator $\hat{f}_n$ is
+\[
+\widehat{R}(\hat{f}_n, Z_{\mathrm{train}}) = \frac{1}{n} \sum_{i=1}^n Q(Y_i, \hat{f}_n(X_i)),
+\qquad
+\hat{f}_n \in \arg\min_{f \in \mathcal{C}} \widehat{R}(f, Z_{\mathrm{train}}).
+\]
+The test set $Z_{\mathrm{test}} = \{(X_j, Y_j)\}_{j=n+1}^{n+m}$ yields an unbiased estimate of $R(\hat{f}_n)$ \emph{only} if it is held out until the final estimator is fixed:
+\[
+\widehat{R}(\hat{f}_n, Z_{\mathrm{test}}) = \frac{1}{m} \sum_{j=n+1}^{n+m} Q(Y_j, \hat{f}_n(X_j)).
+\]
+Whenever we adapt the estimator or its hyperparameters using the test set, we introduce dependencies between the model and the data and obtain a too optimistic risk estimate. Statistical learning therefore mandates the strict separation of training, validation, and testing.
+
+\subsection{Comparing algorithms on shared test data}
+To compare two learning algorithms $A^{(I)}$ and $A^{(II)}$ on the same dataset, we evaluate their paired losses on each test point $j$:
+\[
+\Delta_j = Q(Y_j, \hat{f}_n^{(I)}(X_j)) - Q(Y_j, \hat{f}_n^{(II)}(X_j)), \qquad j = n+1, \ldots, n+m.
+\]
+The sample mean $\overline{\Delta}$ and standard deviation $\operatorname{std}(\Delta)$ of these paired differences quantify which model is better. If $\overline{\Delta} - 2\,\operatorname{std}(\Delta) > 0$, then algorithm $A^{(II)}$ is reliably superior to $A^{(I)}$. This ``first compare, then average'' rule mirrors paired $t$-tests and guards against spurious conclusions from aggregate metrics alone.
+
+\subsection{Data, feature, and measurement spaces}
+Representation begins with deciding \emph{what} we measure:
+\begin{itemize}
+    \item \textbf{Object space $\mathcal{O}$.} Objects (digits, patients, sounds) form the domain of discourse.
+    \item \textbf{Measurements $X$.} A measurement maps tuples of objects into a codomain $K$: $X: \mathcal{O}^{(1)} \times \cdots \times \mathcal{O}^{(R)} \to K$. Measurements can be direct (pixel intensities) or derived (edges, mel-cepstral coefficients).
+    \item \textbf{Feature space $\mathcal{X}$.} Selecting $\mathcal{X}$ fixes the admissible metric and invariances. Numeric $\mathbb{R}^d$, Boolean, or categorical spaces each encode different similarity notions.
+\end{itemize}
+Typical data types emerge from the arity of the measurement:
+\begin{description}
+    \item[Monadic/vectorial:] $X: \mathcal{O} \to \mathbb{R}^d$ for temperature maps or feature vectors.
+    \item[Dyadic:] $X: \mathcal{O}^{(1)} \times \mathcal{O}^{(2)} \to \mathbb{R}$ for user--item interactions or contingency tables.
+    \item[Pairwise similarity:] $X: \mathcal{O} \times \mathcal{O} \to \mathbb{R}$ for protein alignment scores or image patch similarities.
+    \item[Polyadic/multiway:] $X: \mathcal{O}^{(1)} \times \mathcal{O}^{(2)} \times \mathcal{O}^{(3)} \to \mathbb{R}$ such as person $\times$ behavior $\times$ trait tensors or preferential choice data.
+\end{description}
+The taxonomy clarifies whether the learner should expect absolute values, co-occurrence counts, or structured relational inputs.
+
+\subsection{Scale types and transformation invariances}
+Scale choices express which transformations should leave conclusions invariant:
+\begin{itemize}
+    \item \textbf{Nominal scale:} only equality matters; any bijection preserves meaning.
+    \item \textbf{Ordinal scale:} rankings are meaningful; order-preserving functions are admissible.
+    \item \textbf{Interval scale:} information resides in differences; affine transformations $f(x)=ax+c$ with $a>0$ are allowed (e.g., Fahrenheit).
+    \item \textbf{Ratio scale:} differences and ratios matter; only scalings $f(x)=ax$, $a>0$ preserve structure (e.g., Kelvin).
+    \item \textbf{Absolute scale:} literal values matter; only the identity transformation is valid (e.g., exam grades).
+\end{itemize}
+Data whitening---scaling features by their standard deviation---is one practical way to enforce comparable dynamic ranges so that the chosen metric respects the intended invariances.
+
+\subsection{Mathematical spaces underlying representations}
+Different mathematical spaces formalize increasingly rich structures:
+\begin{itemize}
+    \item \textbf{Topological spaces $(X, \mathcal{J})$:} $\mathcal{J}$ is a family of subsets containing $X$ and $\varnothing$, closed under finite intersections and arbitrary unions. Topology captures neighborhood relations without prescribing distances.
+    \item \textbf{Metric spaces $(X, d)$:} A metric $d$ satisfies non-negativity, identity of indiscernibles, symmetry, and the triangle inequality (or the stronger ultrametric inequality). Metrics quantify distances and therefore induce topologies.
+    \item \textbf{Euclidean vector spaces $(V, \phi)$:} A vector space equipped with a scalar product $\phi$ satisfying distributivity, symmetry, homogeneity, and positive definiteness. The induced norm $\|x\| = \sqrt{\phi(x, x)}$ generalizes standard Euclidean geometry.
+\end{itemize}
+Every Euclidean space is metric and thus topological, but the converse need not hold. Representation design should match the amount of reliable structure (topological, metric, or vectorial) that the measurements truly support.
+
+\subsection{Probability spaces}
+Probability theory provides the formal language for risk:
+\begin{itemize}
+    \item \textbf{Sample space} $\Omega = \{\omega_1, \ldots, \omega_N\}$ collects all elementary outcomes (e.g., sequences of coin flips).
+    \item \textbf{Event algebra} $\mathcal{A} \subseteq 2^\Omega$ contains $\Omega$ and is closed under union, intersection, and set difference, so that compound statements about outcomes remain valid events.
+    \item \textbf{Probability measure} $\mathbb P: \mathcal{A} \to [0, 1]$ assigns weights $p(\omega_i)$ to elementary events, satisfies $\mathbb P(\Omega)=1$, and extends additively to events $A \in \mathcal{A}$ via $\mathbb P(A) = \sum_{\omega_i \in A} p(\omega_i)$.
+\end{itemize}
+The triple $(\Omega, \mathcal{A}, P)$ underpins expected risk: once we define the events (representations) and their probabilities, we can integrate losses and reason about generalization.
