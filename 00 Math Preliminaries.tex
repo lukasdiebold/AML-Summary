@@ -1,0 +1,10 @@
+\section{Math Preliminaries}
+\textbf{Gibbs Distribution}
+The Gibbs distribution is a probability distribution that assigns likelihoods to states based on a cost function, with lower-cost states being more probable. Given a set of states $x \in \mathcal{X}$, a cost function $E(x)$, and an inverse temperature parameter $\beta > 0$, the Gibbs distribution is
+$$
+p(x)=\frac{1}{Z}e^{-\beta E(x)}
+$$
+where the partition function $Z$ ensures normalization
+$$
+Z=\sum_{x \in X} e^{-\beta E(x)}
+$$

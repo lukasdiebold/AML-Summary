@@ -1,0 +1,85 @@
+\section{Conceptual Foundation}
+
+\subsection{What is Machine Learning?}
+
+"ML is a mathematization of epistemolagy!". In philosophy, it is the science of knowledge, the science of what can be known. This is relevant, because in ML we are interested in systems that produce/generate knowledge. 
+
+The goal is then to observe 'reality' and draw conclusions from the observations. This can be seen as a perception-action cycle. Where perception is the result of our observations (typically in a data space $\mathcal X$) and the actions are part of a hypothesis space. To go from the data space to the hypothesis class $\mathcal C$ we generally use an algorithm $A$. See Figure \ref{fig:overview_ml} for an overview.
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{images/aml_1.png}
+  \caption{Overview ML}
+  \label{fig:overview_ml}
+\end{figure}
+
+\textbf{Information processing} occurs when $|\mathcal X| \gg |\mathcal C|$. Taking the example of combinatorial optimization problems, $|\mathcal X|$ would be the space of weighted graphs, and we look for a color of the graph or something similar. Then $|\mathcal X| \approx K^{\binom{n}{2}}$ and $|\mathcal C| \approx e^{n \log n}$ so we obserge that $|\mathcal X|$ is much larger. 
+
+\subsection{Conceptual foundation of inference}
+\begin{enumerate}
+    \item Perception of realits is mediated by data of senses/sensors
+    \item Data are stochastic → porbabilistic
+    \item Sensing restricts us to selected aspects of reality
+    \item Humans interpret data by a huge reduction in degrees of freedom \\
+    $\quad|x| \gg|e|$ (space of graphs $\gg$ space of colorings, cycles, spanning trees)
+    \item Tuple (\{data \}, \{hypotheses \}) define models:
+    $$
+    \begin{aligned}
+    \mathcal A: \mathcal X &\longrightarrow \mathcal C \\
+    x &\longmapsto c= \mathcal A(x)
+    \end{aligned}
+    $$
+    \item Experiments $\epsilon$ provide us with data
+    \item Learning means interpreting $X$ w.r.t hypotheses $\mathcal C$
+\end{enumerate}
+
+\subsection{Artificial Intelligence}
+Taking a high level view. We live in very high dimensional data, which we are not able to fully process. We use algorithms to make sense of the data, and this then informs our values, from this we get the following relation
+$$
+\text { Data} \longrightarrow \text{ Algorithms } \mathcal{A} \longrightarrow \text { Values }
+$$
+In epistemology, we differentiate between \textbf{deduction} and \textbf{induction}. Deduction is a form of reasoning in which the conclusion follows necessarily from the premises, while induction tries to generalize, that is, the conclusion goes beyond the premises and generally probabilistic. We can construct a model in which deduction and induction form a \textbf{feedback loop}, not two isolated methods. In simpler terms, on one side we try to formulate axioms from our observations (empirical data), and on the other side we then use these axioms and derive logical consequences from them. This is not anything new, and this cycle generally informs the model of "Theory, Experiment, Computation" in science. What has changed with ML/AI is that we're now in the era of non-parametric modeling.
+
+\subsection{Extracting Value from Data - What is the problem?}
+
+\begin{itemize}
+    \item Algorithms that process inputs with noise compute random variables as outputs!
+    \item Algorithms should compute typical solutions!
+    \item When do algorithms generalize over noise/model mismatch?
+    \item How can algorithms autonomously improve performance?
+\end{itemize}
+
+\subsection{What does Generalization mean?}
+
+\begin{itemize}
+    \item Out-of-sample risk
+    $$
+    \theta^{\star}\left(X^{\prime}\right) \sim \mathbb{P}^{\mathcal{A}}(\theta \mid X) \in \arg \min _{\mathbb{P}(. \mid .)} \mathbb{E}_{X^{\prime}} \mathbb{E}_{\theta \mid X^{\prime}} \mathbb{E}_{X^{\prime \prime} \mid X^{\prime}} R\left(\theta, X^{\prime \prime}\right)
+    $$
+    where $X'$ is the training data and $X''$ is the test data, so thiw is the risk where $\theta$ is conditioned on the training data (trained the model).
+    \item Log loss of posterior (risks and probabilities are dependent!)
+    
+    $$
+    \begin{aligned}
+    \theta^{\star}\left(X^{\prime}\right) \sim \mathbb{P}^{\mathcal{A}}(\theta \mid X) & \in \arg \min _{\mathbb{P}(. \mid .)} \mathbb{E}_{X^{\prime}} \mathbb{E}_{\theta \mid X^{\prime}} \mathbb{E}_{X^{\prime \prime} \mid X^{\prime}}\left(-\log \mathbb{P}\left(\theta \mid X^{\prime \prime}\right)\right) \\
+    & \in \arg \min _{\mathbb{P}(. \mid .)} \mathbb{E}_{X^{\prime}} \mathbb{E}_{\theta \mid X^{\prime}} \mathbb{E}_{X^{\prime \prime} \mid X^{\prime}}\left(\beta R\left(\theta, X^{\prime \prime}\right)+\log Z\right)
+    \end{aligned}
+    $$
+    \item Posterior agreement
+    $$
+    \theta^{\star}\left(X^{\prime}\right) \sim \mathbb{P}^{\mathcal{A}}(\theta \mid X) \in \arg \min _{\mathbb{P}(. \mid .)} \mathbb{E}_{X^{\prime}} \mathbb{E}_{X^{\prime \prime} \mid X^{\prime}}\left(-\log \mathbb{E}_{\theta \mid X^{\prime}} \mathbb{P}\left(\theta \mid X^{\prime \prime}\right)\right)
+    $$
+\end{itemize}
+
+\subsection{Conceptional Foundation of Inference}
+\begin{itemize}
+    \item Our perception of “our world” / reality is mediated by data of senses / sensors.
+    \item Our data are influenced by chance.
+    \item Creatures interpret selected aspects of reality by hypotheses to "survive and reproduce"
+    \item Data and hypotheses define models to enable judgements, decisions and actions.
+    \item AI / ML: Algorithms define relations of data and hypotheses, e.g., they select models !
+\end{itemize}
+
+
+
+
+

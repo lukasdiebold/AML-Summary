@@ -1,0 +1,63 @@
+\section{Regression}
+\subsection{Act 1: High Dimensional regression is unstable}
+
+we assume X and y are distributed according to a distribution $p_*$ (i.e. $X, y \sim p_*$) and 
+$$
+y = f_*(x) + \varepsilon \quad \text{with } \varepsilon \sim \mathcal N(0, \sigma)
+$$
+Then our task ist to estimage $f_*$ from $D = \{x_i, y_i\} \sim p_*$. The problem in this form isn't tractable, this is why we restrict the choice of functions. First we choose the limit ourselfs to linear functions, that is function of the form 
+$$f_*(x) = \beta^\top x$$
+This problem we then solve using Maximum Likelihood Estimation (MLE), that is
+$$
+\begin{aligned}
+\widehat{\beta} &=\arg \max _{\beta \in \mathbb{R}^R} p(D \mid \beta)\\
+&= ... \\
+&= \arg \min \text{MSE}(D, \beta) \\
+&= \frac{1}{n} \sum_{i \leq n} (y_i - \beta ^\top x_i)^2\\
+&= (X^\top X)^{-1} X^\top y \\
+&= ...\\
+&= X^\top (X X ^\top )^{-1}y
+\end{aligned}
+$$
+which is known as the ordinary least squares estimator, where 
+$$
+X=\left[\begin{array}{c}
+-x_1- \\
+\vdots \\
+-x_n-
+\end{array}\right] \quad y=\left[\begin{array}{c}
+y_1 \\
+\vdots \\
+y_n
+\end{array}\right]
+$$
+This estimator has some interesting properties. It is unbiased and has the minimal variance for all unbiased estimators (Gauss-Markov Theorem). % TODO what is this
+Thus, from the formula
+$$
+\text{error} = \text{bias}^2 + \text{variance} + \text{noise}
+$$
+we find that this estimator is the one with the smallest error of all the unbiased estimators. Then why does no-one use this estimator, this is because if we introduce a bit of bias, we can significantly reduce the variance. So what is the variance of $\text{Var}(\hat b)$? For this we use the SVD of $X = UDV^\top$ if we plug this into the formula from above we get
+$$\hat b = VD^{-1}U^\top y$$
+so, since $y$ has a gaussian distribution and we just multiply it with a matrix ($VD^{-1}U^\top$), $\hat b$ also has a gaussian distribution. Then
+$$\operatorname{Var}(\hat{\beta})=\ldots=\sigma^2 V D^{-2} V^{\top} =\sigma^2 \sum_{i \leq n} \frac{1}{D_{ii}^2} V_i V_i^{\top} $$
+What are the implications of this? If we are working with high dimensional data, many of these features are typically correlated, this means that $X$ has a low rank, then the smallest $D_{ii}$ values are very small, which means that the bias is huge. 
+
+\subsection{Act 2: Stability via Regularization}
+The typical process of \textbf{Bayesian inference} goes through the follwing stages:
+\begin{enumerate}
+    \item Prior $\beta \sim \mathcal N(0, \tau^2 I)$
+    \item Observe likelihood $p(D | \beta)$
+    \item Posterior \textit{(adjustment of the likelihood)} $p(\beta | D) \propto p(\beta) p(D | \beta) \propto \exp \left(-\frac{1}{2 \sigma^2} \text{MSE}(D, \beta)-\frac{1}{2 \tau^2}\|\beta\|^2\right)$
+\end{enumerate}
+Observe that the last term is equivalent to the loss induced by the \textbf{Ridge}-Regression. (If we change $\beta$ to have a Laplace distribution (heavy tails), we get \textbf{Lasso}-Regression) By adjusting $\tau$ we can adjust the bias-variance tradeoff. If we do the math we get
+$$\hat{\beta}_{\text {MAP }}=\left(x^{\top} x+\frac{\sigma^2}{\tau^2} I\right)^{-1} x^{\top} y$$ and if we do again an SVD to calculate the variance we get
+$$\text{Var}(\hat \beta_{\text {MAP }}) = \sigma^2 \sum_{i\leq n} \frac{D_{ii}^2}{\left(D_i^2+\frac{\sigma_i^2}{\tau^2}\right)} V_i V_i^{\top}$$
+So we can use $\tau$ to control the whole fraction term, which is an improvement to the situation we had before. 
+
+\subsection{Act 3: Polynomial regression via }
+Now we change our assumption for $f_*(x)$ so that it is a polynomial function on $x$. We have
+$$f_*(x) = \varphi(x)^\top \beta _*$$
+where $\beta_* \in \mathbb{R}^{\infty}$ and 
+$$
+\varphi(X)=K_x\left(\frac{x_1^{\alpha_1} ... x_d^{\alpha_d}}{\sqrt{\alpha_{1}!\ldots \alpha_{d}!}}\right)_{\alpha \in \mathbb{N}^d}
+$$

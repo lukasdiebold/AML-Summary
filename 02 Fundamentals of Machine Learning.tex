@@ -1,0 +1,93 @@
+\section{Fundamentals of Machine Learing}
+Bayes Rule: 
+$$
+\mathbb{P}( \text{model} \mid \text{data}) =\frac{\mathbb{P}(\text { data } \mid \text { model }) \mathbb{P}(\text { model })}{\mathbb{P}(\text { data })}
+$$
+
+ML method: 
+$$
+\widehat{\text { model }_m} \in \arg \max _{\text {model }} \mathbb{P} (\text{data} \mid \text{model)}
+$$
+where $\widehat{\text{model}_{n}}$ is consistent, asymptotically normal, and asymptotically efficient\\
+
+\textbf{consistency}: a point estimated $\hat{\theta}_{n}$ of the parameter $\theta=\theta_{0}$ is consistent if 
+$$
+\forall \varepsilon>0,  \mathbb{P}\left(\left|\hat{\theta}_{n}-\theta_{0}\right|>\varepsilon\right) \xrightarrow{n \rightarrow \infty} 0
+$$
+
+more formally 
+$$\forall \theta, \forall \varepsilon, \delta>0, \exists n_{0}, \forall n>n_{0}, \mathbb{P}\left(\left|\widehat{\theta}_{n}-\theta\right|<\varepsilon\right)>1-\delta
+$$
+\textbf{efficiency}: 
+$$
+\quad \hat{\theta}_{n}=\arg \operatorname{uin}_{\hat{\theta}} \mathbb{E}\left[\left(\hat{\theta}_{n}-\theta_{0}\right)^{2}\right]
+$$
+
+\subsection{Efficiency: Rao Cramer bound}
+Problem: Precision of parameters estimation.\\
+Given the likelihood $p(y \mid \theta)$ for $\theta \in \Theta$, data $y_{1}, \ldots, y_{n} \sim p\left(y \mid \theta=\theta_{0}\right)$ we are interested in the question: "How precisely can we estimate \(\theta=\theta_{0}\) given n samples?". To answer this we define an estimator $\hat{\theta}\left(y_{1}, \ldots, y_{n}\right)$ and estimate the expected deviation 
+$$\quad \mathbb{E}_{y \mid \theta}\left[(\hat{\theta}-\theta)^{2}\right]$$
+
+Score: \(\Lambda=\frac{\partial}{\partial \theta} \log p(y \mid \theta)=\frac{\frac{\partial}{\partial \theta} p(y \mid \theta)}{p(y \mid \theta)}\)\\
+bias : \(b_{\hat{\theta}}=\mathbb{E}_{y \mid \theta}\left[\hat{\theta}\left(y_{1}, \ldots, y_{n}\right)\right]-\theta\)
+
+Expected score :
+
+\[
+\begin{aligned}
+\mathbb{E}_{y \mid \theta}[\Lambda] & =\int p(y \mid \theta) \frac{\frac{\partial}{\partial \theta} p(y \mid \theta)}{p(y \mid \theta)} d y \\
+& =\frac{\partial}{\partial \theta} \int p(y \mid \theta) d y=\frac{\partial}{\partial \theta} 1=0
+\end{aligned}
+\]
+
+Expected score times estimator product :
+
+\[
+\begin{aligned}
+\mathbb{E}_{y \mid \theta}[\Lambda \hat{\theta}] & =\int \rho(y \mid \theta) \frac{\frac{\partial}{\partial \theta} \rho(y \mid \theta)}{\rho(y \mid \theta)} \hat{\theta} d y \\
+& =\frac{\partial}{\partial \theta}\left(\int \rho(y \mid \theta) \hat{\theta} d y-\theta\right)+1 \\
+& =\frac{\partial}{\partial \theta}\left(\mathbb{E}_{y \mid \theta} \hat{\theta}-\theta\right)+1=\frac{\partial}{\partial \theta} b_{\hat{\theta}}+1
+\end{aligned}
+\]
+
+Cross correlation between score and estimator :
+
+\[
+\mathbb{E}_{y \mid \theta}[(\Lambda-\underbrace{\mathbb{E} \Lambda}_{=0})(\hat{\theta}-\mathbb{E} \hat{\theta})]=\mathbb{E}_{y \mid \theta}[\Lambda \hat{\theta}]-\underbrace{\mathbb{E}_{y \mid \theta}[\Lambda]}_{=0} \mathbb{E} \hat{\theta}
+\]
+
+Cauchy-Schwarz inequality :
+
+\[
+\begin{aligned}
+& \left(\mathbb{E}_{y \mid \theta}[\Lambda(\hat{\theta}-\mathbb{E} \hat{\theta})]\right)^{2} \leq \mathbb{E}_{y \mid \theta}\left[\Lambda^{2}\right] \mathbb{E}_{y \mid \theta}\left[(\hat{\theta}-\theta-\mathbb{E} \hat{\theta}+\theta)^{2}\right] \\
+& =\mathbb{E}_{y \mid \theta}\left[\Lambda^{2}\right]\left(\mathbb{E}_{y \mid \theta}\left[(\hat{\theta}-\theta)^{2}\right]-\mathcal{L}(\mathbb{E} \hat{\theta}-\theta)^{2}+(\mathbb{E} \hat{\theta}-\theta)^{2}\right) \\
+& =\mathbb{E}_{y \mid \theta}\left[\Lambda^{2}\right]\left(\mathbb{E}_{y \mid \theta}\left[(\hat{\theta}-\theta)^{2}\right]-b_{\hat{\theta}}^{2}\right) \\
+& \mathbb{E}_{y \mid \theta}\left[(\hat{\theta}-\theta)^{2}\right] \geq \frac{\left(\mathbb{E}_{y \mid \theta}[\Lambda \hat{\theta}]\right)^{2}}{\mathbb{E}_{y \mid \theta}\left[\Lambda^{2}\right]}+b_{\hat{\theta}}^{2}=\frac{\left(\frac{\partial}{\partial \theta} b_{\hat{\theta}}+1\right)^{2}}{\mathbb{E}_{y \mid \theta}\left[\Lambda^{2}\right]}+b_{\hat{\theta}}^{2}
+\end{aligned}
+\]
+
+⇒ General Rao Cramer bound for estimator \(\hat{\theta}\)
+
+\[
+\mathbb{E}_{y \mid \theta}\left[(\hat{\theta}-\theta)^{2}\right] \geq \frac{\left(\frac{\partial}{\partial \theta} b_{\hat{\theta}}+1\right)^{2}}{\mathbb{E}_{y \mid \theta}\left[\Lambda^{2}\right]}+b_{\hat{\theta}}^{2}
+\]
+
+Fisher information : \(\mathbb{E}_{y \mid \theta}\left[\Lambda^{2}\right]=\int \rho(y \mid \theta)\left(\frac{\partial}{\partial \theta} \log \rho(y \mid \theta)\right)^{2} d y=: I(\theta)\)\\
+Remartes\\
+\includegraphics[max width=\textwidth, center]{e31ae44f-6c7e-4099-b40f-284f97c9d0cd-5}\\
+II) Note tradeoff \(\frac{\partial}{\partial \theta} b_{\hat{\theta}}<0\) vs. \(b_{\hat{\theta}}^{2}\) for biased estimators! unbiased estimators unght not be the best estimators!\\
+case with \(\boldsymbol{n}\) samples
+
+\[
+\begin{aligned}
+\mathbb{E}_{y_{1}, \ldots, y_{n} \mid \theta}\left[\Lambda^{2}\right] & =\int p\left(y_{1}, \ldots, y_{n} \mid \theta\right) \underbrace{\frac{\partial}{\partial \theta} \log p\left(y_{1}, \ldots, y_{n} \mid \theta\right)}_{=\frac{\partial}{\partial \theta} \sum_{i=n} \log p\left(y_{i} \mid \theta\right)=\sum_{i=n} \Lambda_{i}})^{2} d y_{1} \ldots d y_{n}=: I^{(n)}(\theta) \\
+& =\int p\left(y_{1}, \ldots, y_{n} \mid \theta\right)(\sum_{i=n} \Lambda_{i}^{2}+\underbrace{\sum_{i=n} \sum_{j=n} \Lambda_{i} \Lambda_{j}}_{=0}) d y_{1} \ldots d y_{n} \\
+& =\sum_{i=n} \int p\left(y_{i} \mid \theta\right) \Lambda_{i}^{2} d y_{i}=n I(\theta)
+\end{aligned}
+\]
+
+Remark: The Fisher information of \(n\) iid. r.v. is \(n \times\) Fishes information of 1 r.v.
+
+
+
