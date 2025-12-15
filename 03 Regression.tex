@@ -1,25 +1,31 @@
 \section{Regression}
 \subsection{Act 1: High-dimensional regression is unstable}
 
-we assume X and y are distributed according to a distribution $p_*$ (i.e. $X, y \sim p_*$) and 
+We assume $X$ and $y$ are distributed according to a distribution $p_*$ (i.e. $X, y \sim p_*$), where the output follows a noisy linear model:
 $$
-y = f_*(x) + \varepsilon \quad \text{with } \varepsilon \sim \mathcal N(0, \sigma)
+y = f_*(x) + \varepsilon \quad \text{with } \varepsilon \sim \mathcal N(0, \sigma^2)
 $$
-Then our task is to estimate $f_*$ from $D = \{x_i, y_i\} \sim p_*$. The problem in this form is not tractable, this is why we restrict the choice of functions. First we limit ourselves to linear functions, that is functions of the form 
+Here $f_*$ is the true (unknown) regression function and $\varepsilon$ is additive Gaussian noise with variance $\sigma^2$. Our task is to estimate $f_*$ from training data $D = \{(x_i, y_i)\}_{i=1}^n \sim p_*$.
+
+The problem in this form is not tractable because the space of all possible functions is too large. We therefore restrict ourselves to linear functions:
 $$f_*(x) = \beta^\top x$$
-This problem we then solve using Maximum Likelihood Estimation (MLE), that is
+where $\beta \in \mathbb{R}^d$ is a parameter vector. Given the Gaussian noise assumption, each observation has likelihood $p(y_i | x_i, \beta) = \mathcal{N}(\beta^\top x_i, \sigma^2)$. We solve for $\beta$ using Maximum Likelihood Estimation (MLE):
 $$
 \begin{aligned}
-\widehat{\beta} &=\arg \max _{\beta \in \mathbb{R}^R} p(D \mid \beta)\\
-&= ... \\
-&= \arg \min \text{MSE}(D, \beta) \\
-&= \frac{1}{n} \sum_{i \leq n} (y_i - \beta ^\top x_i)^2\\
-&= (X^\top X)^{-1} X^\top y \\
-&= ...\\
-&= X^\top (X X ^\top )^{-1}y
+\widehat{\beta} &=\arg \max _{\beta \in \mathbb{R}^d} p(D \mid \beta)\\
+&= \arg \max _{\beta} \prod_{i=1}^n \frac{1}{\sqrt{2\pi\sigma^2}} \exp\left(-\frac{(y_i - \beta^\top x_i)^2}{2\sigma^2}\right) \\
+&= \arg \min _{\beta} \sum_{i=1}^n (y_i - \beta ^\top x_i)^2 \\
+&= \arg \min _{\beta} \text{MSE}(D, \beta)
 \end{aligned}
 $$
-which is known as the ordinary least squares estimator, where 
+Maximizing the log-likelihood is equivalent to minimizing the mean squared error (MSE). The closed-form solution depends on whether we have more features than samples or vice versa:
+$$
+\begin{aligned}
+\widehat{\beta} &= (X^\top X)^{-1} X^\top y \quad \text{(when } d < n\text{, more samples than features)} \\
+&= X^\top (X X ^\top )^{-1}y \quad \text{(when } d > n\text{, more features than samples)}
+\end{aligned}
+$$
+These are algebraically equivalent by the Woodbury matrix identity. The first formula is the standard \textit{ordinary least squares (OLS)} estimator, where 
 $$
 X=\left[\begin{array}{c}
 -x_1- \\
@@ -36,38 +42,55 @@ Thus, from the formula
 $$
 \text{error} = \text{bias}^2 + \text{variance} + \text{noise}
 $$
-we find that this estimator is the one with the smallest error of all the unbiased estimators. Then why does no-one use this estimator? If we introduce a bit of bias, we can significantly reduce the variance. So what is $\operatorname{Var}(\hat b)$? For this we use the SVD of $X = UDV^\top$; if we plug this into the formula from above we get
-$$\hat b = VD^{-1}U^\top y$$
-so, since $y$ has a gaussian distribution and we just multiply it with a matrix ($VD^{-1}U^\top$), $\hat b$ also has a gaussian distribution. Then
-$$\operatorname{Var}(\hat{\beta})=\ldots=\sigma^2 V D^{-2} V^{\top} =\sigma^2 \sum_{i \leq n} \frac{1}{D_{ii}^2} V_i V_i^{\top} $$
-What are the implications of this? In high-dimensional data many features are correlated, so $X$ is close to low rank and several singular values $D_{ii}$ are tiny. The $1/D_{ii}^2$ factors then explode, making the variance (and with it prediction instability) very large, even though the estimator remains unbiased. 
+we find that this estimator is the one with the smallest error of all the unbiased estimators. Then why does no-one use this estimator? If we introduce a bit of bias, we can significantly reduce the variance.
+
+To understand the instability, we analyze $\operatorname{Var}(\hat{\beta})$ using the singular value decomposition (SVD) $X = UDV^\top$, where $U \in \mathbb{R}^{n \times n}$ and $V \in \mathbb{R}^{d \times d}$ are orthogonal, and $D$ is diagonal with singular values $D_{11} \geq D_{22} \geq \ldots \geq 0$. Plugging this into the OLS formula:
+$$\hat{\beta} = (X^\top X)^{-1}X^\top y = (VD^\top U^\top UDV^\top)^{-1} VD^\top U^\top y = VD^{-1}U^\top y$$
+Since $y = X\beta_* + \varepsilon$ where $\varepsilon \sim \mathcal{N}(0, \sigma^2 I)$, and we multiply $y$ by the deterministic matrix $VD^{-1}U^\top$, the estimator $\hat{\beta}$ is also Gaussian. Its variance is:
+$$\operatorname{Var}(\hat{\beta})=\operatorname{Var}(VD^{-1}U^\top y) = VD^{-1}U^\top \operatorname{Var}(y) U D^{-1}V^\top =\sigma^2 V D^{-2} V^{\top} =\sigma^2 \sum_{i \leq r} \frac{1}{D_{ii}^2} V_i V_i^{\top} $$
+where $r = \text{rank}(X)$ and $V_i$ is the $i$-th column of $V$ (the $i$-th right singular vector).
+
+\textbf{The problem:} In high-dimensional data, features are often correlated (e.g., pixel intensities in images, gene expressions). This makes $X$ close to low-rank, so several singular values $D_{ii}$ are very small. The variance contributions $1/D_{ii}^2$ then explode for these directions, causing massive instability in $\hat{\beta}$ even though it remains unbiased. Small noise in $y$ gets amplified enormously in directions with small singular values, leading to wild predictions on test data. 
 
 \subsection{Act 2: Stability via Regularization}
-The typical process of \textbf{Bayesian inference} goes through the follwing stages:
+The solution to the variance blow-up is to introduce regularization, which adds a small amount of bias in exchange for a large reduction in variance. We can derive regularization naturally from a Bayesian perspective.
+
+The typical process of \textbf{Bayesian inference} goes through the following stages:
 \begin{enumerate}
-    \item Prior $\beta \sim \mathcal N(0, \tau^2 I)$
-    \item Observe likelihood $p(D | \beta)$
-    \item Posterior \textit{(adjustment of the likelihood)} $p(\beta | D) \propto p(\beta) p(D | \beta) \propto \exp \left(-\frac{1}{2 \sigma^2} \text{MSE}(D, \beta)-\frac{1}{2 \tau^2}\|\beta\|^2\right)$
+    \item Prior $\beta \sim \mathcal N(0, \tau^2 I)$ — we assume $\beta$ is drawn from a Gaussian centered at zero with variance $\tau^2$. This encodes our belief that coefficients should not be too large.
+    \item Likelihood $p(D | \beta) = \prod_i \mathcal{N}(y_i | \beta^\top x_i, \sigma^2)$ — same Gaussian noise model as before.
+    \item Posterior (via Bayes' rule) $p(\beta | D) \propto p(\beta) p(D | \beta) \propto \exp \left(-\frac{1}{2 \sigma^2} \text{MSE}(D, \beta)-\frac{1}{2 \tau^2}\|\beta\|^2\right)$
 \end{enumerate}
-Observe that the last term is equivalent to the loss induced by \textbf{ridge regression}. With a Laplace prior (heavy tails) on $\beta$ we obtain \textbf{lasso} instead. The prior variance $\tau^2$ controls the amount of shrinkage and therefore the bias-variance trade-off. If we do the math we get
-$$\hat{\beta}_{\text {MAP }}=\left(x^{\top} x+\frac{\sigma^2}{\tau^2} I\right)^{-1} x^{\top} y$$ and if we do again an SVD to calculate the variance we get
-$$\text{Var}(\hat \beta_{\text {MAP }}) = \sigma^2 \sum_{i\leq n} \frac{D_{ii}^2}{\left(D_i^2+\frac{\sigma_i^2}{\tau^2}\right)} V_i V_i^{\top}$$
-Compared to OLS, the shrinkage factor $\frac{D_{ii}^2}{D_i^2+\sigma_i^2/\tau^2}$ down-weights directions with small singular values, reducing variance at the cost of introducing bias. 
+The posterior combines the likelihood (fit to data) with the prior (regularization). Taking the negative log gives the objective:
+$$
+\hat{\beta}_{\text{MAP}} = \arg\min_{\beta} \left[ \frac{1}{2\sigma^2} \sum_i (y_i - \beta^\top x_i)^2 + \frac{1}{2\tau^2} \|\beta\|^2 \right]
+$$
+This is precisely \textbf{ridge regression} with regularization parameter $\lambda = \sigma^2/\tau^2$. The $\ell^2$ penalty $\|\beta\|^2$ shrinks coefficients toward zero. If we instead use a Laplace prior $p(\beta) \propto \exp(-|\beta|/\tau)$ with heavier tails, we obtain \textbf{lasso regression} with an $\ell^1$ penalty $\|\beta\|_1$, which promotes sparsity.
+
+The prior variance $\tau^2$ controls the bias-variance trade-off: small $\tau^2$ means strong regularization (more bias, less variance), while large $\tau^2$ recovers OLS (no bias, high variance). The MAP (maximum a posteriori) solution is:
+$$\hat{\beta}_{\text {MAP }}=\left(X^{\top} X+\frac{\sigma^2}{\tau^2} I\right)^{-1} X^{\top} y$$
+Compare this to OLS: the regularization term $\frac{\sigma^2}{\tau^2} I$ is added to $X^\top X$ before inversion, preventing ill-conditioning. Using SVD again to analyze the variance:
+$$\text{Var}(\hat \beta_{\text {MAP }}) = \sigma^2 \sum_{i\leq r} \frac{D_{ii}^2}{\left(D_{ii}^2+\frac{\sigma^2}{\tau^2}\right)^2} V_i V_i^{\top}$$
+The key is the \textbf{shrinkage factor} $\frac{D_{ii}^2}{(D_{ii}^2+\sigma^2/\tau^2)^2}$. For large singular values ($D_{ii}^2 \gg \sigma^2/\tau^2$), this is close to $1/D_{ii}^2$ (like OLS). For small singular values ($D_{ii}^2 \ll \sigma^2/\tau^2$), the factor is approximately $\tau^4 D_{ii}^2/\sigma^4$, which decays much more slowly than $1/D_{ii}^2$. This prevents variance blow-up in the problematic low-variance directions, stabilizing the estimator at the cost of introducing bias (shrinking coefficients toward zero). 
 
 \subsection{Act 3: Polynomial regression via kernels}
-Now we change our assumption for $f_*(x)$ so that it is a polynomial function on $x$. We have
+Now we change our assumption for $f_*(x)$ to allow for nonlinear functions. We model $f_*$ as a linear function in an infinite-dimensional feature space:
 $$f_*(x) = \varphi(x)^\top \beta _*$$
-where $\beta_* \in \mathbb{R}^{\infty}$ and 
+where $\beta_* \in \mathbb{R}^{\infty}$ and $\varphi(x)$ maps each input to an infinite-dimensional polynomial feature representation:
 $$
 \varphi(X)=K_x\left(\frac{x_1^{\alpha_1} ... x_d^{\alpha_d}}{\sqrt{\alpha_{1}!\ldots \alpha_{d}!}}\right)_{\alpha \in \mathbb{N}^d}
 $$
-Then for $x, x^{\prime} \in \mathbb{R}^a$
+This includes all polynomial terms of all degrees. The normalization by factorials ensures the inner product has a clean closed form.
+
+Remarkably, the inner product of two infinite-dimensional feature vectors yields the radial basis function (RBF) kernel. For $x, x^{\prime} \in \mathbb{R}^a$:
 $$
 \begin{aligned}
 \varphi(x)^{\top} \varphi\left(x^{\prime}\right) & =K_{RBF}\left(x, x^{\prime}\right) \\
 & =\exp \left(-\frac{1}{2} ||x-x^{\prime} ||^2\right)
 \end{aligned}$$
-and 
+This follows from the Taylor expansion of the exponential function. The RBF kernel measures similarity: it is 1 when $x = x'$ and decays as points move apart.
+
+We still want to minimize the MSE, but now in the infinite-dimensional feature space:
 $$
 \begin{aligned}
 \hat{\beta} & =\arg \min _{\beta \in \mathbb{R}^{\infty}} \frac{1}{n} \sum_{i \leq n}\left(y_i-\varphi\left(x_i\right)^{\top} \beta\right)^2 \\
@@ -82,7 +105,9 @@ $$
 \varphi\left(x_n\right)^{\top}
 \end{array}\right] \in \mathbb R^{n \times \infty}
 $$
-This doesn't look good. But let $x_*$ be a test point. Then
+Despite $\beta$ living in infinite dimensions, the representer theorem guarantees the solution lies in the span of the training features, so we can work with the $n \times n$ Gram matrix $\Phi \Phi^{\top}$ instead of the infinite-dimensional feature space directly.
+
+To make a prediction at test point $x_*$, we compute:
 $$
 \begin{aligned}
 \hat y_* & =\varphi\left(x_*\right)^{\top} \hat{\beta} \\
@@ -90,7 +115,9 @@ $$
 &= k(x_*)^{\top} K^{-1} y
 \end{aligned}
 $$
-where $k(x_*) = \left(\varphi\left(x_*\right)^{\top} \varphi\left(x_i\right)\right)_{1 \leq i \leq n}$ and $K_{ij}=\left(\varphi(x_i)^{\top} \varphi(x_j)\right)$. This is the kernel trick: we only need inner products via $K$, not the infinite-dimensional $\varphi(\cdot)$.
+where $k(x_*) = \left(\varphi\left(x_*\right)^{\top} \varphi\left(x_i\right)\right)_{1 \leq i \leq n} = \left(K_{RBF}(x_*, x_i)\right)_{1 \leq i \leq n}$ is an $n$-dimensional vector of kernel evaluations between the test point and each training point, and $K_{ij}=\varphi(x_i)^{\top} \varphi(x_j) = K_{RBF}(x_i, x_j)$ is the $n \times n$ kernel matrix.
+
+This is the \textbf{kernel trick}: we never explicitly construct the infinite-dimensional $\varphi(\cdot)$. Instead, we only compute inner products via the kernel function $K_{RBF}$, which can be evaluated in closed form. The prediction is a weighted combination of training outputs, where the weights depend on how similar the test point is to each training point.
 
 The problem is that the inversion of the matrix is $O(n^3)$, which becomes costly for large datasets even though we avoided the infinite feature map explicitly.
 
