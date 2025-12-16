@@ -53,6 +53,7 @@ where $r = \text{rank}(X)$ and $V_i$ is the $i$-th column of $V$ (the $i$-th rig
 \textbf{The problem:} In high-dimensional data, features are often correlated (e.g., pixel intensities in images, gene expressions). This makes $X$ close to low-rank, so several singular values $D_{ii}$ are very small. The variance contributions $1/D_{ii}^2$ then explode for these directions, causing massive instability in $\hat{\beta}$ even though it remains unbiased. Small noise in $y$ gets amplified enormously in directions with small singular values, leading to wild predictions on test data. 
 
 \subsection{Act 2: Stability via Regularization}
+\label{chap:regression:act2}
 The solution to the variance blow-up is to introduce regularization, which adds a small amount of bias in exchange for a large reduction in variance. We can derive regularization naturally from a Bayesian perspective.
 
 The typical process of \textbf{Bayesian inference} goes through the following stages:
@@ -61,16 +62,50 @@ The typical process of \textbf{Bayesian inference} goes through the following st
     \item Likelihood $p(D | \beta) = \prod_i \mathcal{N}(y_i | \beta^\top x_i, \sigma^2)$ — same Gaussian noise model as before.
     \item Posterior (via Bayes' rule) $p(\beta | D) \propto p(\beta) p(D | \beta) \propto \exp \left(-\frac{1}{2 \sigma^2} \text{MSE}(D, \beta)-\frac{1}{2 \tau^2}\|\beta\|^2\right)$
 \end{enumerate}
-The posterior combines the likelihood (fit to data) with the prior (regularization). Taking the negative log gives the objective:
+The posterior combines the likelihood (fit to data) with the prior (regularization). To derive the optimization objective, we use the fact that maximizing the posterior probability is equivalent to minimizing its negative logarithm. From Bayes' rule:
 $$
-\hat{\beta}_{\text{MAP}} = \arg\min_{\beta} \left[ \frac{1}{2\sigma^2} \sum_i (y_i - \beta^\top x_i)^2 + \frac{1}{2\tau^2} \|\beta\|^2 \right]
+p(\beta | D) \propto p(\beta) p(D | \beta) = \mathcal{N}(0, \tau^2 I) \cdot \prod_i \mathcal{N}(y_i | \beta^\top x_i, \sigma^2)
 $$
+
+Taking the negative log (up to constant terms):
+$$
+-\log p(\beta | D) \propto \underbrace{-\log p(\beta)}_{-\frac{1}{2\tau^2}\|\beta\|^2 + \text{const}} + \underbrace{-\log p(D|\beta)}_{-\sum_i \log \mathcal{N}(y_i | \beta^\top x_i, \sigma^2)} 
+$$
+
+For Gaussian distributions, $-\log \mathcal{N}(y | \mu, \sigma^2) = \frac{(y-\mu)^2}{2\sigma^2} + \text{const}$, so:
+$$
+-\log p(\beta | D) \propto \frac{1}{2\tau^2}\|\beta\|^2 + \frac{1}{2\sigma^2}\sum_i (y_i - \beta^\top x_i)^2
+$$
+
+Minimizing this gives the MAP (maximum a posteriori) estimate:
+\begin{align*}
+    \hat{\beta}_{\text{MAP}} &= \arg\min_{\beta} \left[ \frac{1}{2\sigma^2} \sum_i (y_i - \beta^\top x_i)^2 + \frac{1}{2\tau^2} \|\beta\|^2 \right] \\
+    & =\arg \min _\beta\left[\sum_i\left(y_i-\beta^{\top} x_i\right)^2+\lambda\|\beta\|^2\right]
+\end{align*}
 This is precisely \textbf{ridge regression} with regularization parameter $\lambda = \sigma^2/\tau^2$. The $\ell^2$ penalty $\|\beta\|^2$ shrinks coefficients toward zero. If we instead use a Laplace prior $p(\beta) \propto \exp(-|\beta|/\tau)$ with heavier tails, we obtain \textbf{lasso regression} with an $\ell^1$ penalty $\|\beta\|_1$, which promotes sparsity.
 
-The prior variance $\tau^2$ controls the bias-variance trade-off: small $\tau^2$ means strong regularization (more bias, less variance), while large $\tau^2$ recovers OLS (no bias, high variance). The MAP (maximum a posteriori) solution is:
-$$\hat{\beta}_{\text {MAP }}=\left(X^{\top} X+\frac{\sigma^2}{\tau^2} I\right)^{-1} X^{\top} y$$
-Compare this to OLS: the regularization term $\frac{\sigma^2}{\tau^2} I$ is added to $X^\top X$ before inversion, preventing ill-conditioning. Using SVD again to analyze the variance:
-$$\text{Var}(\hat \beta_{\text {MAP }}) = \sigma^2 \sum_{i\leq r} \frac{D_{ii}^2}{\left(D_{ii}^2+\frac{\sigma^2}{\tau^2}\right)^2} V_i V_i^{\top}$$
+The prior variance $\tau^2$ controls the bias-variance trade-off: small $\tau^2$ (big $\lambda$) means strong regularization (more bias, less variance), while large $\tau^2$ (small $\lambda$) recovers OLS (no bias, high variance). The MAP (maximum a posteriori) solution is:
+\begin{equation}
+    \label{eq:map-ridge}
+    \hat{\beta}_{\text {MAP }}=\left(X^{\top} X+\lambda I\right)^{-1} X^{\top} y
+\end{equation}
+	\textbf{Derivation.} Start from the MAP/ridge objective in matrix form
+\[
+J(\beta) = \sum_i (y_i - x_i^{\top}\beta)^2 + \lambda\,\|\beta\|^2
+\;=\; \|y - X\beta\|^2 + \lambda\, \beta^{\top}\beta.
+\]
+Differentiate and set the gradient to zero:
+\begin{align*}
+\nabla_\beta J(\beta)
+&= -2 X^{\top}(y - X\beta) + 2\lambda\,\beta \\
+&= 2\,(X^{\top}X + \lambda I)\beta - 2 X^{\top}y \,=\, 0.
+\end{align*}
+Thus the normal equations are $(X^{\top}X + \lambda I)\,\hat\beta = X^{\top}y$. For $\lambda>0$, the matrix $X^{\top}X + \lambda I$ is positive definite and hence invertible, which yields the closed form in \eqref{eq:map-ridge}.
+Compare this to OLS: the regularization term $\lambda I$ is added to $X^\top X$ before inversion, preventing ill-conditioning. Using SVD again to analyze the variance:
+\begin{equation}
+    \label{eq:var-ridge}
+    \text{Var}(\hat \beta_{\text {MAP }}) = \sigma^2 \sum_{i\leq r} \frac{D_{ii}^2}{\left(D_{ii}^2+\lambda\right)^2} V_i V_i^{\top}
+\end{equation}
 The key is the \textbf{shrinkage factor} $\frac{D_{ii}^2}{(D_{ii}^2+\sigma^2/\tau^2)^2}$. For large singular values ($D_{ii}^2 \gg \sigma^2/\tau^2$), this is close to $1/D_{ii}^2$ (like OLS). For small singular values ($D_{ii}^2 \ll \sigma^2/\tau^2$), the factor is approximately $\tau^4 D_{ii}^2/\sigma^4$, which decays much more slowly than $1/D_{ii}^2$. This prevents variance blow-up in the problematic low-variance directions, stabilizing the estimator at the cost of introducing bias (shrinking coefficients toward zero). 
 
 \subsection{Act 3: Polynomial regression via kernels}

@@ -1,0 +1,69 @@
+\section{Gaussian Processes for Regression}
+
+Gaussian processes (GPs) turn Bayesian linear regression into a flexible, non-parametric model that reasons about functions via distributions over all possible outputs. The slides emphasize three pillars: (i) the Bayesian linear regression foundation, (ii) kernel engineering for encoding inductive biases, and (iii) prediction, validation, and application pipelines that exploit GP uncertainty.
+
+\subsection{From Bayesian linear regression to GPs}
+Linear regression with Gaussian noise assumes $Y = x^\top \beta + \varepsilon$ with $\varepsilon \sim \mathcal{N}(0, \sigma^2)$. Placing a Gaussian prior on the weights, $\beta \sim \mathcal{N}(0, \Lambda^{-1})$, yields the posterior
+\[
+p(\beta \mid X, y) = \mathcal{N}\bigl(\mu_\beta, \Sigma_\beta \bigr), \qquad
+\mu_\beta = \bigl(X^\top X + \sigma^2 \Lambda\bigr)^{-1} X^\top y, \quad
+\Sigma_\beta = \sigma^2 \bigl(X^\top X + \sigma^2 \Lambda\bigr)^{-1}.
+\]
+
+\textbf{Understanding the posterior:} The posterior mean $\mu_\beta$ combines the data (via $X^\top X$ and $X^\top y$) with the prior precision $\Lambda$. This is exactly the ridge regression solution we saw in Chapter \ref{chap:regression:act2}, where $\Lambda$ acts as a regularization matrix (compare to equation \ref{eq:map-ridge}). The term $X^\top X + \sigma^2 \Lambda$ plays the role of a regularized Hessian, stabilizing the inversion. The posterior covariance $\Sigma_\beta$ (compare to equation \ref{eq:var-ridge}) captures uncertainty about $\beta$: directions along which the data is uninformative (small eigenvalues of $X^\top X$) retain their prior uncertainty, while directions well-explained by data shrink toward zero. Note that all uncertainty decreases with sample size $n$ (more rows in $X$), and the marginal posterior variance of the $i$-th weight is $\Sigma_\beta^{ii}$.
+
+Observations are linear combinations of Gaussian variables, so the vector of outputs $y = X\beta + \varepsilon$ is jointly Gaussian with mean zero and covariance
+\[
+\mathrm{Cov}(y) = X \Lambda^{-1} X^\top + \sigma^2 I_n.
+\]
+Defining $k(x_i, x_j) = x_i^\top \Lambda^{-1} x_j$ turns this covariance into a kernel (Gram) matrix $K$, so $y \sim \mathcal{N}(0, K + \sigma^2 I)$. Replacing the dot-product kernel by any valid positive semi-definite kernel function “kernelizes” Bayesian ridge regression; the resulting stochastic process over functions is a Gaussian process.
+
+\subsection{Kernel design}
+Kernels encode similarity and thereby the structure of the functions we wish to learn:
+\begin{itemize}
+    \item Valid kernels must be symmetric and generate positive semi-definite Gram matrices for any finite set of inputs. They implicitly act as inner products in (possibly infinite-dimensional) Hilbert spaces.
+    \item Standard kernels on $\mathbb{R}^d$ include linear $k(x, x') = x^\top x'$, polynomial $k(x, x') = (x^\top x' + 1)^p$, squared exponential $k(x, x') = \sigma_f^2 \exp(-\|x - x'\|^2 / (2\ell^2))$, rational quadratic, exponential, and periodic kernels. Each carries different invariances (smoothness, periodicity, etc.).
+    \item Kernels compose: sums, products, positive scalings, or applying positive-coefficient polynomials / exponentials to a base kernel all preserve validity. This “kernel engineering” enables similarity measures on non-vector data such as strings, graphs (diffusion kernels), or probability distributions.
+\end{itemize}
+Designing an appropriate kernel is tantamount to choosing the hypothesis space for the GP.
+
+\subsection{Prediction with Gaussian processes}
+Given training data $(X, y)$ and a test input $x_\star$, the joint distribution of $y$ and $y_\star$ is Gaussian:
+\[
+\begin{bmatrix}
+y \\
+y_\star
+\end{bmatrix}
+\sim \mathcal{N}\left(
+\mathbf{0},
+\begin{bmatrix}
+K + \sigma^2 I & k \\
+k^\top & c
+\end{bmatrix}
+\right),
+\]
+where $K = k(X, X)$, $k = k(x_\star, X)$ is the vector of cross-covariances, and $c = k(x_\star, x_\star) + \sigma^2$. Conditioning a multivariate Gaussian gives the predictive distribution
+\[
+p(y_\star \mid x_\star, X, y) = \mathcal{N}\bigl(\mu_\star, \sigma_\star^2\bigr), \quad
+\mu_\star = k^\top (K + \sigma^2 I)^{-1} y, \quad
+\sigma_\star^2 = c - k^\top (K + \sigma^2 I)^{-1} k.
+\]
+Hence GPs output both a mean prediction and an uncertainty quantification. The slides provide the corresponding pseudo-code loop: compute $K$, solve the linear system, and return the resulting Gaussian. Efficient implementations cache the Cholesky factorization of $K + \sigma^2 I$ for repeated predictions.
+
+\subsection{Validating kernels and hyperparameters}
+Practical GP performance depends on hyperparameters such as the length-scale $\ell$, signal variance $\sigma_f^2$, or kernel choice. The lecture highlights:
+\begin{itemize}
+    \item Evidence maximization (type-II ML) to optimize hyperparameters by maximizing $\log p(y \mid X, \theta)$.
+    \item Cross-validation schemes (random splits, leave-one-out) that rank kernels by predictive performance on held-out data. Synthetic experiments show that proper scoring rules recover the data-generating kernel, while real data (e.g., power plant energy output) can exhibit different optima depending on the scoring metric (squared exponential vs.\ periodic kernels).
+    \item Bayesian comparison of “teacher” and “student” kernels: evaluate how well a candidate kernel matches data generated from another kernel by comparing their posterior predictive distributions.
+\end{itemize}
+Kernel validation is therefore an empirical model-selection layer that complements theoretical kernel properties.
+
+\subsection{Applications: control and fMRI}
+Because GPs model functions with calibrated uncertainty, they are appealing for safety-critical and data-efficient applications:
+\begin{itemize}
+    \item \textbf{Safe Bayesian optimization for control.} In automatic controller tuning (e.g., quadrotor flight), the unknown performance function over controller parameters is modeled as a GP. Safe optimization explores only parameter settings whose predicted performance exceeds a safety threshold with high probability, gradually expanding the safe set and converging to the global optimum using few evaluations.
+    \item \textbf{Robust controller design.} GPs capture both the mean and variance of system responses, enabling controllers that respect safety constraints while improving performance across uncertain dynamics. Comparisons to hand-tuned controllers highlight faster convergence and higher reliability.
+    \item \textbf{Neuroimaging / fMRI.} (Briefly noted on the slides) GPs provide non-parametric spatial priors and can interpolate neural activity with quantified uncertainty, though detailed derivations are beyond the summary’s scope.
+\end{itemize}
+These case studies reinforce that GP regression is more than a curve fitting tool—it is a probabilistic modeling framework that unifies inference, kernel engineering, and safety-aware decision making.
