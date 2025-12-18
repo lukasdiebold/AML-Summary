@@ -90,9 +90,8 @@ with $\mathbf{a}_1,\mathbf{u}_1 \in \mathbb{R}^e$, $\mathbf{a}_2,\mathbf{u}_2 \i
 p(\mathbf{a}_2 \mid \mathbf{a}_1 = \mathbf{z}) = \mathcal{N}\!\left(\,\mathbf{u}_2 + \Sigma_{21} \Sigma_{11}^{-1}(\mathbf{z} - \mathbf{u}_1),\; \Sigma_{22} - \Sigma_{21} \Sigma_{11}^{-1} \Sigma_{12}\,\right).
 \]
 \end{derivation}
-Hence GPs output \textbf{both a mean prediction and an uncertainty quantification}. The slides provide the corresponding pseudo-code loop: compute $K$, solve the linear system, and return the resulting Gaussian. Efficient implementations cache the Cholesky factorization of $K + \sigma^2 I$ for repeated predictions.
+Hence GPs output \textbf{both a mean prediction and an uncertainty quantification}. This is however not the real uncertainty about the function value at $x_\star$, but the uncertainty we get inside our model, which is constrained to gaussian processes with a specific kernel.
 
-\subsection{Pseudo-Code for Prediction}
 \includegraphics[width=0.8\textwidth]{images/gaussian_process_prediction.png}
 
 The prediction algorithm returns a distribution function. The prediction at $x_{n+1}$ yields a mean value $\mu_{y_{n+1}}$ and $a$ variance $\sigma_{y_{n+1}}^2$. Furthermore, samples $y_{n+1}$ can be drawn from this distribution.
