@@ -1,0 +1,104 @@
+\section{Ensemble Methods}
+
+Ensemble methods combine multiple base learners to obtain a predictor whose bias, variance, or loss surface is superior to any constituent model. By averaging or sequentially correcting learners trained on diverse views of the data, ensembles produce more stable predictions, calibrated uncertainties, and richer inductive biases than single models. This chapter summarizes the bootstrap-based family (bagging and random forests), boosting, and more general stacking strategies, with an emphasis on how they target different points along the bias--variance trade-off.
+
+\subsection{Why ensembles help}
+Let $\hat f(x)$ be a single hypothesis trained on data $D$. Ensembles form $\hat f_{\text{ens}}(x) = \sum_{b=1}^B w_b \hat f_b(x)$ from base learners $\hat f_b$. Two canonical effects explain their success:
+\begin{itemize}
+    \item \textbf{Variance reduction.} If the $\hat f_b$'s are identically distributed with variance $\sigma^2$ and pairwise correlation $\rho$, then
+    \[
+        \operatorname{Var}\bigl[\hat f_{\text{avg}}(x)\bigr] = \rho \sigma^2 + \frac{1 - \rho}{B} \sigma^2,
+    \]
+    which shrinks as $B$ increases whenever $\rho < 1$. Bagging manipulates the data (bootstrap samples) to drive correlations down and thus stabilize high-variance learners such as decision trees or neural networks trained on small data.
+    \begin{derivation}
+    For the average predictor $\hat f_{\text{avg}}(x) = \tfrac{1}{B} \sum_{b=1}^B \hat f_b(x)$,
+    \[
+        \begin{aligned}
+        \operatorname{Var}[\hat{f}(x)] & =\mathbb{E}_D\left(\hat{f}(X)-\mathbb{E}_D \hat{f}(X)\right)^2 \\
+        & =\mathbb{E}_D\left(\frac{1}{B} \sum_{i=1}^B \hat{f}_i(x)-\frac{1}{B} \sum_{i=1}^B \mathbb{E}_D \hat{f}_i(x)\right)^2 \\
+        & =\mathbb{E}_D\left(\frac{1}{B} \sum_{i=1}^B\left(\hat{f}_i(x)-\mathbb{E}_D \hat{f}_i(x)\right)\right)^2 \\
+        & =\frac{1}{B^2} \sum_{i=1}^B \operatorname{Var}_D\left[\hat{f}_i(x)\right]+\frac{1}{B^2} \sum_{i \neq j} \operatorname{Cov}\left[\hat{f}_i(x), \hat{f}_j(x)\right]
+        \end{aligned}
+    \]
+    If all base learners share variance $\sigma^2$ and pairwise covariance $\operatorname{Cov}(\hat f_i, \hat f_j) = \rho\,\sigma^2$,
+    \begin{align*}
+    \operatorname{Var}\bigl[\hat f_{\text{avg}}(x)\bigr]
+    &= \frac{B}{B^2} \sigma^2 + \frac{B(B-1)}{B^2} \, \rho\,\sigma^2 \\
+    &= \frac{1}{B}\,\sigma^2 + \left(1 - \frac{1}{B}\right) \rho\,\sigma^2 \\
+    &= \rho \sigma^2 + \frac{1 - \rho}{B} \sigma^2.
+    \end{align*}
+    Thus variance decreases like $1/B$ when correlations are small ($\rho \approx 0$), while residual correlation limits the gain.
+    \end{derivation}
+    \item \textbf{Bias correction.} Sequential ensembles such as boosting fit a series of weak learners to the residuals (negative gradients) of the current model. Each stage nudges the predictor toward lower bias and can transform a barely better-than-random base learner into a strong classifier.
+\end{itemize}
+These mechanisms are complementary: bagging primarily attacks variance, boosting primarily attacks bias, and stacking blends heterogeneous models to capture complementary inductive biases.
+
+\subsection{Bagging}
+\textbf{Bootstrap aggregating (bagging)} trains $B$ base predictors on bootstrap replicates $D_b$ drawn with replacement from $D$. For a regression tree learner $\hat{f}(x; D_b)$ the bagged predictor is
+\[
+    \hat f_{\text{bag}}(x) = \frac{1}{B} \sum_{b=1}^B \hat f(x; D_b),
+    \qquad
+    \hat p_{\text{bag}}(y \mid x) = \frac{1}{B} \sum_{b=1}^B \hat p(y \mid x; D_b)
+\]
+for regression or probabilistic classification, respectively. Averaging smooths out spurious splits triggered by sampling noise and produces nearly unbiased uncertainty estimates by comparing the ensemble spread around $\hat f_{\text{bag}}$.
+
+\textbf{Out-of-bag (OOB) validation.} Each data point is excluded from roughly $36\%$ of bootstrap samples. Predictions aggregated over models that did not train on $x_i$ approximate leave-one-out validation without an explicit validation set, providing error estimates and enabling tuning (e.g., tree depth, number of features) directly from training data.
+
+\begin{notebox}
+Bagging works best when the base learner is (i) high variance and (ii) able to fit the bootstrap sample strongly. Stable learners (e.g., linear regression with $\ell_2$ regularization) gain little because resampling barely changes the fitted model, so the ensemble collapses to a single hypothesis.
+\end{notebox}
+
+\subsection{Random forests}
+\textbf{Random forests} enhance bagging by injecting feature-level randomness, thereby decorrelating the trees further. In each internal node, a tree chooses the best split among $m_{\text{try}}$ randomly selected features (commonly $\sqrt{d}$ for classification or $d/3$ for regression). The resulting predictor
+\[
+    \hat f_{\text{RF}}(x) = \frac{1}{B} \sum_{b=1}^B T_b(x),
+\]
+where $T_b$ is a fully grown, unpruned tree, inherits low variance because the node-level randomness reduces $\rho$ in the variance expression above. Additional benefits include:
+\begin{itemize}
+    \item \textbf{Implicit feature selection:} features rarely chosen for splits likely lack predictive power; aggregating split statistics yields variable-importance measures.
+    \item \textbf{Robustness to class imbalance:} by re-weighting bootstrap draws or using balanced subsampling, forests maintain accuracy even when one class dominates.
+    \item \textbf{Proximities and uncertainty:} the fraction of trees that land in the same leaf as $x_i$ defines a similarity metric; empirical distributions of votes supply predictive intervals.
+\end{itemize}
+
+\subsection{Boosting}
+Boosting constructs an additive model
+\[
+    F_T(x) = \sum_{t=1}^T \gamma_t h_t(x)
+\]
+with weak learners $h_t$ chosen to maximize the descent along the negative gradient of a differentiable loss. AdaBoost specializes this framework to exponential loss and binary classification:
+\begin{enumerate}
+    \item Initialize sample weights $w_i^{(1)} = 1/n$.
+    \item At step $t$, train $h_t$ to minimize weighted error $\varepsilon_t = \sum_i w_i^{(t)} \mathbf{1}\{h_t(x_i) \neq y_i\}$.
+    \item Set $\alpha_t = \frac{1}{2} \log \frac{1 - \varepsilon_t}{\varepsilon_t}$ and update weights
+    \[
+        w_i^{(t+1)} = \frac{w_i^{(t)} \exp(-\alpha_t y_i h_t(x_i))}{Z_t},
+    \]
+    where $Z_t$ normalizes the distribution.
+    \item Output $F_T(x) = \operatorname{sign}\left(\sum_{t=1}^T \alpha_t h_t(x) \right)$.
+\end{enumerate}
+Each stage focuses on examples misclassified so far. Under mild conditions, training error decays exponentially with $T$, and the margin distribution explains AdaBoost's generalization ability.
+
+\textbf{Gradient boosting} generalizes AdaBoost by performing steepest-descent in function space. For differentiable loss $\ell(y, F(x))$, the residuals are the negative gradients $r_i^{(t)} = -\left.\frac{\partial \ell(y_i, F(x_i))}{\partial F}\right|_{F = F_{t-1}}$. Fitting a regression tree $h_t$ to $(x_i, r_i^{(t)})$ and adding it with learning rate $\nu$ yields
+\[
+    F_t(x) = F_{t-1}(x) + \nu \gamma_t h_t(x), \qquad
+    \gamma_t = \arg\min_{\gamma} \sum_i \ell\left(y_i, F_{t-1}(x_i) + \nu \gamma h_t(x_i)\right).
+\]
+Choice of $\nu$, tree depth, and subsampling ratio controls shrinkage and prevents overfitting. Modern variants (XGBoost, LightGBM, CatBoost) incorporate second-order Taylor approximations, histogram-based splits, and column subsampling to scale boosting to millions of observations.
+
+\subsection{Stacking and model averaging}
+Stacked generalization (stacking) learns a meta-model on top of out-of-fold predictions from heterogeneous base learners such as neural networks, kernel machines, and tree ensembles. Given base predictions $z_i = [\hat f_1(x_i), \ldots, \hat f_K(x_i)]^\top$, a meta-learner $g(z)$ minimizes validation loss and outputs
+\[
+    \hat y = g\bigl(\hat f_1(x), \ldots, \hat f_K(x)\bigr).
+\]
+Cross-validation prevents target leakage by ensuring $g$ never sees predictions on points used to fit the corresponding base model. Compared to bagging or boosting, stacking can exploit complementary feature representations (e.g., CNN features plus hand-crafted statistics) and yields calibrated probabilistic forecasts when $g$ is a logistic regression with constraints $\sum_k w_k = 1$, $w_k \ge 0$.
+
+\subsection{Practical guidance}
+\begin{itemize}
+    \item \textbf{Hyperparameter selection.} Number of estimators ($B$), tree depth, learning rate, and subsampling ratios have the largest impact. OOB error supplies an inexpensive proxy for cross-validation in bagging/forests, whereas boosting benefits from $k$-fold or time-series splits.
+    \item \textbf{Interpretability.} Partial dependence plots and SHAP values can be computed on ensembles to interpret non-linear interactions. Random forest feature importance or permutation scores act as a first diagnostic, but they may be biased toward high-cardinality features; conditional permutation mitigates this.
+    \item \textbf{Computation.} Parallelize bagging and random forests over trees; boosting is sequential but can parallelize histogram construction and tree search. Warm-starting (re-using previous trees) accelerates hyperparameter sweeps.
+    \item \textbf{Regularization.} Early stopping, shrinkage ($\nu < 0.1$), $\ell_1/\ell_2$ penalties on leaf weights, or sample/feature subsampling keep boosting ensembles from overfitting. For bagging, limiting tree depth or minimum leaf size guards against noise amplification.
+\end{itemize}
+Ensembles thus provide a versatile toolbox: use bagging and random forests when variance is the bottleneck, boosting when bias dominates or when precise control over loss gradients is needed, and stacking when heterogeneous models capture distinct structures in the data.
+
+% TODO: this chapter is started on the 2025 1009 (very limited) maybe picked up later
