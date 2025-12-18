@@ -54,7 +54,7 @@ Kernels encode similarity and thereby the structure of the functions we wish to 
 Designing an appropriate kernel is tantamount to choosing the hypothesis space for the GP.
 
 \subsection{Prediction with Gaussian processes}
-Given training data $(X, y)$ and a test input $x_\star$, the joint distribution of $y$ and $y_\star$ is Gaussian:
+Given training data $(X, y)$ and a test input $x_\star$, we are interested in $y_\star$. The joint distribution of $y$ and $y_\star$ is Gaussian:
 \[
 \begin{bmatrix}
 y \\
@@ -68,35 +68,29 @@ k^\top & c
 \end{bmatrix}
 \right),
 \]
-where $K = k(X, X)$, $k = k(x_\star, X)$ is the vector of cross-covariances, and $c = k(x_\star, x_\star) + \sigma^2$. Conditioning a multivariate Gaussian gives the predictive distribution
+where $K = k(X, X)$, $k = k(x_\star, X)$ is the vector of cross-covariances, and $c = k(x_\star, x_\star) + \sigma^2$. This is a natural extension of the setup without $x_\star$. Conditioning a multivariate Gaussian gives the predictive distribution
 \[
 p(y_\star \mid x_\star, X, y) = \mathcal{N}\bigl(\mu_\star, \sigma_\star^2\bigr), \quad
 \mu_\star = k^\top (K + \sigma^2 I)^{-1} y, \quad
 \sigma_\star^2 = c - k^\top (K + \sigma^2 I)^{-1} k.
 \]
 \begin{derivation}
-Let the joint distribution be (see the Schur complement note in §\ref{sec:schur-complement})
+\textbf{Theorem (Conditional Gaussian).} Suppose
 \[
-\begin{bmatrix} y \\ y_\star \end{bmatrix}
-\sim \mathcal{N}\!\left(\mathbf{0},\
+\begin{bmatrix} \mathbf{a}_1 \\ \mathbf{a}_2 \end{bmatrix} \sim \mathcal{N}\!\left(
+\begin{bmatrix} \mathbf{u}_1 \\ \mathbf{u}_2 \end{bmatrix},
 \begin{bmatrix}
-\Sigma_{yy} & \Sigma_{y\star} \\
-\Sigma_{\star y} & \Sigma_{\star\star}
-\end{bmatrix}\right),\quad
-\Sigma_{yy} = K + \sigma^2 I,\ \Sigma_{\star y} = k^\top,\ \Sigma_{\star\star} = c.
+\Sigma_{11} & \Sigma_{12} \\
+\Sigma_{21} & \Sigma_{22}
+\end{bmatrix}
+\right),
 \]
-For a jointly Gaussian vector, the conditional distribution of $y_\star$ given $y$ is Gaussian with
+with $\mathbf{a}_1,\mathbf{u}_1 \in \mathbb{R}^e$, $\mathbf{a}_2,\mathbf{u}_2 \in \mathbb{R}^f$, and covariance blocks $\Sigma_{11} \in \mathbb{R}^{e\times e}$, $\Sigma_{12} \in \mathbb{R}^{e\times f}$, $\Sigma_{21} \in \mathbb{R}^{f\times e}$, $\Sigma_{22} \in \mathbb{R}^{f\times f}$ positive semidefinite. Then the conditional distribution of $\mathbf{a}_2$ given $\mathbf{a}_1 = \mathbf{z}$ is
 \[
-\mathbb{E}[y_\star \mid y] = \Sigma_{\star y}\, \Sigma_{yy}^{-1} y = k^\top (K + \sigma^2 I)^{-1} y,
+p(\mathbf{a}_2 \mid \mathbf{a}_1 = \mathbf{z}) = \mathcal{N}\!\left(\,\mathbf{u}_2 + \Sigma_{21} \Sigma_{11}^{-1}(\mathbf{z} - \mathbf{u}_1),\; \Sigma_{22} - \Sigma_{21} \Sigma_{11}^{-1} \Sigma_{12}\,\right).
 \]
-and
-\[
-\operatorname{Var}(y_\star \mid y) = \Sigma_{\star\star} - \Sigma_{\star y}\, \Sigma_{yy}^{-1} \, \Sigma_{y\star}
-= c - k^\top (K + \sigma^2 I)^{-1} k,
-\]
-which yields the stated predictive mean $\mu_\star$ and variance $\sigma_\star^2$.
 \end{derivation}
-Hence GPs output both a mean prediction and an uncertainty quantification. The slides provide the corresponding pseudo-code loop: compute $K$, solve the linear system, and return the resulting Gaussian. Efficient implementations cache the Cholesky factorization of $K + \sigma^2 I$ for repeated predictions.
+Hence GPs output \textbf{both a mean prediction and an uncertainty quantification}. The slides provide the corresponding pseudo-code loop: compute $K$, solve the linear system, and return the resulting Gaussian. Efficient implementations cache the Cholesky factorization of $K + \sigma^2 I$ for repeated predictions.
 
 \subsection{Pseudo-Code for Prediction}
 \includegraphics[width=0.8\textwidth]{images/gaussian_process_prediction.png}
