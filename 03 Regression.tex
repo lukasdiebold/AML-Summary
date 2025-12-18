@@ -89,7 +89,8 @@ The prior variance $\tau^2$ controls the bias-variance trade-off: small $\tau^2$
     \label{eq:map-ridge}
     \hat{\beta}_{\text {MAP }}=\left(X^{\top} X+\lambda I\right)^{-1} X^{\top} y
 \end{equation}
-	\textbf{Derivation.} Start from the MAP/ridge objective in matrix form
+\begin{derivation}
+Start from the MAP/ridge objective in matrix form
 \[
 J(\beta) = \sum_i (y_i - x_i^{\top}\beta)^2 + \lambda\,\|\beta\|^2
 \;=\; \|y - X\beta\|^2 + \lambda\, \beta^{\top}\beta.
@@ -101,6 +102,7 @@ Differentiate and set the gradient to zero:
 &= 2\,(X^{\top}X + \lambda I)\beta - 2 X^{\top}y \,=\, 0.
 \end{align*}
 Thus the normal equations are $(X^{\top}X + \lambda I)\,\hat\beta = X^{\top}y$. For $\lambda>0$, the matrix $X^{\top}X + \lambda I$ is positive definite and hence invertible, which yields the closed form in \eqref{eq:map-ridge}.
+\end{derivation}
 Compare this to OLS: the regularization term $\lambda I$ is added to $X^\top X$ before inversion, preventing ill-conditioning. Using SVD again to analyze the variance:
 \begin{equation}
     \label{eq:var-ridge}

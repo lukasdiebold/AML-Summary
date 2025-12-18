@@ -8,3 +8,57 @@ where the partition function $Z$ ensures normalization
 $$
 Z=\sum_{x \in X} e^{-\beta E(x)}
 $$
+
+\subsection{Conditional distribution of a multivariate Gaussian}
+\label{sec:cond-gaussian}
+Let
+\[
+\begin{bmatrix} a \\ b \end{bmatrix} \sim \mathcal{N}\!\left(\begin{bmatrix} \mu_a \\ \mu_b \end{bmatrix},\
+\begin{bmatrix}
+\Sigma_{aa} & \Sigma_{ab} \\
+\Sigma_{ba} & \Sigma_{bb}
+\end{bmatrix}\right),
+\]
+where $\Sigma_{aa}$ and $\Sigma_{bb}$ are covariance blocks and $\Sigma_{ab} = \Sigma_{ba}^\top$. Then the conditional distribution of $a$ given $b$ is again Gaussian with
+\[
+\mathbb{E}[a\mid b] = \mu_a + \Sigma_{ab} \, \Sigma_{bb}^{-1} (b - \mu_b),\quad
+\operatorname{Cov}(a\mid b) = \Sigma_{aa} - \Sigma_{ab} \, \Sigma_{bb}^{-1} \, \Sigma_{ba}.
+\]
+This identity underlies Gaussian process prediction, Bayesian linear regression posteriors, and Kalman filtering.
+
+\begin{derivation}
+Write the joint as a block Gaussian and use the Schur complement. The joint log-density (up to constants) is
+\[
+\ell(a,b) = \tfrac{1}{2}\begin{bmatrix} a-\mu_a \\ b-\mu_b \end{bmatrix}^{\!\top}
+\begin{bmatrix}
+\Sigma_{aa} & \Sigma_{ab} \\
+\Sigma_{ba} & \Sigma_{bb}
+\end{bmatrix}^{\!-1}
+\begin{bmatrix} a-\mu_a \\ b-\mu_b \end{bmatrix}.
+\]
+Completing the square in $a$ (or applying the standard conditional Gaussian formula) yields
+\[
+\mathbb{E}[a\mid b] = \mu_a + \Sigma_{ab} \Sigma_{bb}^{-1}(b-\mu_b),\quad
+\operatorname{Cov}(a\mid b) = \Sigma_{aa} - \Sigma_{ab} \Sigma_{bb}^{-1} \Sigma_{ba}.
+\]
+Equivalently, these follow from the block inversion identity and the Schur complement of $\Sigma_{bb}$.
+\end{derivation}
+
+\subsection{Schur complement}
+\label{sec:schur-complement}
+\begin{notebox}
+For a block matrix $M = \begin{bmatrix} A & B \\ C & D \end{bmatrix}$ with $D$ invertible, the \textbf{Schur complement of $D$ in $M$} is
+\[
+S = A - B D^{-1} C.
+\]
+Key identities (when the required inverses exist):
+\begin{itemize}
+	\item Determinant: $\det(M) = \det(D)\, \det(S)$.
+	\item Block inverse: $M^{-1} = \begin{bmatrix}
+	S^{-1} & -S^{-1} B D^{-1} \\
+	-D^{-1} C S^{-1} & D^{-1} + D^{-1} C S^{-1} B D^{-1}
+	\end{bmatrix}$.
+	\item If $M$ is symmetric positive (semi)definite and $D$ is invertible, then $S$ is also positive (semi)definite.
+\end{itemize}
+Symmetrically, if $A$ is invertible, the Schur complement of $A$ is $D - C A^{-1} B$. In Gaussian conditioning, $\operatorname{Cov}(a\mid b)$ equals the Schur complement of $\Sigma_{bb}$ in the joint covariance.
+\end{notebox}

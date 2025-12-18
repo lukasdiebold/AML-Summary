@@ -16,7 +16,33 @@ Observations are linear combinations of Gaussian variables, so the vector of out
 \[
 \mathrm{Cov}(y) = X \Lambda^{-1} X^\top + \sigma^2 I_n.
 \]
+\begin{derivation}
+Since $\beta \sim \mathcal{N}(0, \Lambda^{-1})$ and $\varepsilon \sim \mathcal{N}(0, \sigma^2 I_n)$ are independent,
+\begin{align*}
+\mathbb{E}[y] &= \mathbb{E}[X\beta + \varepsilon] = X\,\mathbb{E}[\beta] + \mathbb{E}[\varepsilon] = 0, \\
+\operatorname{Cov}(y) &= \mathbb{E}\big[(y - \mathbb{E}y)(y - \mathbb{E}y)^\top\big] 
+= \mathbb{E}\big[(X\beta + \varepsilon)(X\beta + \varepsilon)^\top\big] \\
+&= X\,\mathbb{E}[\beta\beta^\top] X^\top + \mathbb{E}[\varepsilon\varepsilon^\top] + X\,\mathbb{E}[\beta\varepsilon^\top] + \mathbb{E}[\varepsilon\beta^\top] X^\top \\
+&= X\,\Lambda^{-1} X^\top + \sigma^2 I_n,
+\end{align*}
+where the cross terms vanish by independence (and zero means).
+\end{derivation}
 Defining $k(x_i, x_j) = x_i^\top \Lambda^{-1} x_j$ turns this covariance into a kernel (Gram) matrix $K$, so $y \sim \mathcal{N}(0, K + \sigma^2 I)$. Replacing the dot-product kernel by any valid positive semi-definite kernel function “kernelizes” Bayesian ridge regression; the resulting stochastic process over functions is a Gaussian process.
+
+\subsection{What is a Gaussian process?}
+A \textbf{Gaussian process (GP)} is a collection of random variables indexed by inputs (e.g., $x \in \mathbb{R}^d$) such that any finite subset has a joint Gaussian distribution. Equivalently, a GP is a \emph{distribution over functions}. We write
+\[
+f \sim \mathcal{GP}\bigl(m, k\bigr),\quad m(x) = \mathbb{E}[f(x)],\ \ k(x, x') = \operatorname{Cov}(f(x), f(x')).
+\]
+For any inputs $X = [x_1, \ldots, x_n]$, the function values satisfy
+\[
+f(X) = [f(x_1), \ldots, f(x_n)]^\top \sim \mathcal{N}\bigl(m(X),\ K\bigr),\quad K_{ij} = k(x_i, x_j).
+\]
+With Gaussian observation noise $y = f(X) + \varepsilon$, $\varepsilon \sim \mathcal{N}(0, \sigma^2 I)$, we obtain
+\[
+y \sim \mathcal{N}\bigl(m(X),\ K + \sigma^2 I\bigr).
+\]
+The mean function $m$ and kernel $k$ fully specify the prior over functions: the kernel encodes smoothness, invariances, and correlation structure. Conditioning the prior GP on data $(X, y)$ yields a \emph{posterior GP} with updated mean and covariance, whose predictive mean/variance coincide with the closed-form formulas presented below. This makes GPs a principled, non-parametric way to model functions with calibrated uncertainty.
 
 \subsection{Kernel design}
 Kernels encode similarity and thereby the structure of the functions we wish to learn:
@@ -48,7 +74,34 @@ p(y_\star \mid x_\star, X, y) = \mathcal{N}\bigl(\mu_\star, \sigma_\star^2\bigr)
 \mu_\star = k^\top (K + \sigma^2 I)^{-1} y, \quad
 \sigma_\star^2 = c - k^\top (K + \sigma^2 I)^{-1} k.
 \]
+\begin{derivation}
+Let the joint distribution be (see the Schur complement note in §\ref{sec:schur-complement})
+\[
+\begin{bmatrix} y \\ y_\star \end{bmatrix}
+\sim \mathcal{N}\!\left(\mathbf{0},\
+\begin{bmatrix}
+\Sigma_{yy} & \Sigma_{y\star} \\
+\Sigma_{\star y} & \Sigma_{\star\star}
+\end{bmatrix}\right),\quad
+\Sigma_{yy} = K + \sigma^2 I,\ \Sigma_{\star y} = k^\top,\ \Sigma_{\star\star} = c.
+\]
+For a jointly Gaussian vector, the conditional distribution of $y_\star$ given $y$ is Gaussian with
+\[
+\mathbb{E}[y_\star \mid y] = \Sigma_{\star y}\, \Sigma_{yy}^{-1} y = k^\top (K + \sigma^2 I)^{-1} y,
+\]
+and
+\[
+\operatorname{Var}(y_\star \mid y) = \Sigma_{\star\star} - \Sigma_{\star y}\, \Sigma_{yy}^{-1} \, \Sigma_{y\star}
+= c - k^\top (K + \sigma^2 I)^{-1} k,
+\]
+which yields the stated predictive mean $\mu_\star$ and variance $\sigma_\star^2$.
+\end{derivation}
 Hence GPs output both a mean prediction and an uncertainty quantification. The slides provide the corresponding pseudo-code loop: compute $K$, solve the linear system, and return the resulting Gaussian. Efficient implementations cache the Cholesky factorization of $K + \sigma^2 I$ for repeated predictions.
+
+\subsection{Pseudo-Code for Prediction}
+\includegraphics[width=0.8\textwidth]{images/gaussian_process_prediction.png}
+
+The prediction algorithm returns a distribution function. The prediction at $x_{n+1}$ yields a mean value $\mu_{y_{n+1}}$ and $a$ variance $\sigma_{y_{n+1}}^2$. Furthermore, samples $y_{n+1}$ can be drawn from this distribution.
 
 \subsection{Validating kernels and hyperparameters}
 Practical GP performance depends on hyperparameters such as the length-scale $\ell$, signal variance $\sigma_f^2$, or kernel choice. The lecture highlights:
@@ -64,6 +117,5 @@ Because GPs model functions with calibrated uncertainty, they are appealing for 
 \begin{itemize}
     \item \textbf{Safe Bayesian optimization for control.} In automatic controller tuning (e.g., quadrotor flight), the unknown performance function over controller parameters is modeled as a GP. Safe optimization explores only parameter settings whose predicted performance exceeds a safety threshold with high probability, gradually expanding the safe set and converging to the global optimum using few evaluations.
     \item \textbf{Robust controller design.} GPs capture both the mean and variance of system responses, enabling controllers that respect safety constraints while improving performance across uncertain dynamics. Comparisons to hand-tuned controllers highlight faster convergence and higher reliability.
-    \item \textbf{Neuroimaging / fMRI.} (Briefly noted on the slides) GPs provide non-parametric spatial priors and can interpolate neural activity with quantified uncertainty, though detailed derivations are beyond the summary’s scope.
 \end{itemize}
 These case studies reinforce that GP regression is more than a curve fitting tool—it is a probabilistic modeling framework that unifies inference, kernel engineering, and safety-aware decision making.

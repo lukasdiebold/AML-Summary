@@ -12,6 +12,13 @@
 \usepackage{graphicx}
 \usepackage[colorlinks=true, allcolors=blue]{hyperref}
 
+% Shaded derivation blocks
+\usepackage{xcolor}
+\usepackage{framed}
+\definecolor{shadecolor}{gray}{0.95}
+\newenvironment{derivation}{\begin{snugshade}\noindent\textit{Derivation.}\ }{\end{snugshade}}
+\newenvironment{notebox}{\begin{snugshade}\noindent\textit{Note.}\ }{\end{snugshade}}
+
 
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.5em}
