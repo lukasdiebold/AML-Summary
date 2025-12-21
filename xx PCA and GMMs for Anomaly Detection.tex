@@ -89,3 +89,50 @@ This gives us a lower bound on the log-likelihood, since the KL divergence is al
     \log p_\theta(x) \geq M(q, \theta)
 \end{equation}
 and we have equality if and only if $q(Z) = p_\theta(Z | x)$.
+
+\subsection{EM Algorithm}
+The Expectation-Maximization (EM) algorithm is an iterative method used to find maximum likelihood estimates of parameters in statistical models with latent variables. In the context of fitting a GMM, the EM algorithm alternates between two main steps: the Expectation (E) step and the Maximization (M) step.
+\begin{itemize}
+    \item \textbf{E-step:} In this step, we compute the expected value of the complete-data log-likelihood with respect to the current estimate of the parameters $\theta^{(t)}$. This involves calculating the posterior probabilities of the latent variables given the observed data and the current parameter estimates. Specifically, we set:
+    \begin{equation}
+        q^{(t+1)}(Z) = p_{\theta^{(t)}}(Z | X)
+    \end{equation}
+    \item \textbf{M-step:} In this step, we maximize the expected complete-data log-likelihood computed in the E-step with respect to the parameters $\theta$. This gives us updated parameter estimates:
+    \begin{equation}
+        \theta^{(t+1)} = \arg\max_\theta M(q^{(t+1)}, \theta)
+    \end{equation}
+\end{itemize}
+The EM algorithm iterates between these two steps until convergence, which is typically determined by checking if the change in the log-likelihood or the parameter estimates falls below a predefined threshold.
+
+\subsection{Validation Metrics}
+We want a function $\phi : \mathbb{R}^D \rightarrow \{0, 1\}$ that that classifies points as normal (0) or anomalous (1). Given a threshold $\tau$. We have two objectives: (let $C = \{x : \phi(x) = 1\}$ be the set of points classified as anomalous, and $A$ be the set of true anomalies)
+\begin{itemize}
+    \item If $x \in A$, then $\phi(x) = 1$
+    \begin{equation}
+        \text{Recall} = \frac{|C \cap A|}{|A|}
+    \end{equation}
+    'Reatio of the correctly identified anomalous among \textbf{all truly anomalous} points'
+
+    How many of the actual anomalous points did we identify?
+    \item If $\phi(x) = 1$, then $x \in A$ (Precision)
+    \begin{equation}
+        \text{Precision} = \frac{|C \cap A|}{|C|}
+    \end{equation}
+    'Ratio of the correctly identified anomalous points among \textbf{all identified anomalous points}'
+
+    How many of the points we classified as anomalous are actually anomalous?
+\end{itemize}
+We can combine these two metrics into a single metric called the F1-score, which is the harmonic mean of precision and recall:
+\begin{equation}
+    \text {F1 Score }=\frac{2}{\frac{1}{\text { Precision }}+\frac{1}{\text { Recall }}}
+\end{equation}
+The F1-score provides a balanced measure of the model's performance in identifying anomalies, taking into account both precision and recall.
+
+\subsection{Combined Pipeline}
+Given a set $X \in \mathbb{R}^D$ of "normal" points, we train an anomaly detector as follows.
+\begin{enumerate}
+    \item We compute a projector $\pi: \mathbb{R}^D \rightarrow \mathbb{R}^d$ using PCA.
+    \item We then fit a pdf $p_\theta(\cdot)$ with k -components to $\{\pi(x): x \in X\}$, using the EM algorithm.
+    \item For a new point, its "anomaly score" is $-\log p_\theta(\pi(x))$.
+    
+\end{enumerate}
