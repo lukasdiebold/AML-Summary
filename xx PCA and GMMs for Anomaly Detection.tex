@@ -1,0 +1,91 @@
+\section{PCA and GMMs for Anomaly Detection}
+The task of anomaly detection involves identifying data points that deviate significantly from the norm. In situations like banks needing to detect fraudulent transactions, or hospitals aiming to identify unusual patient health metrics, effective anomaly detection methods are crucial.
+\subsection{Anomalies}
+Typically, we have a space of all possible events $\mathcal X$ and a subset called the normal set $\mathcal N \subseteq \mathcal X$. An anomaly is any event $x \in \mathcal X$ such that $x \notin \mathcal N$. What makes this challenging is that the normal set $\mathcal N$ is often not explicitly defined, and we may only have access to a limited set of examples from $\mathcal N$. The way we approach this problem is to do a dimensionality reduction $\Pi$ on the data to find a lower-dimensional representation that captures the essential structure of the normal data. We can then use this representation to identify anomalies.
+
+The generalized approach looks like this:
+\begin{enumerate}
+    \item An anomaly is an unlikely event.
+    \item We fit a model of a parametric family of distributions $\mathcal H = \{p(x; \theta) : \theta \in \Theta\}$
+    \item We define an anomaly score $-\log p_{\hat{\theta}}(x)$
+\end{enumerate}
+
+We choose a GMM (Gaussian Mixture Model) as our parametric family of distributions. A GMM is a weighted sum of multiple Gaussian distributions, which allows us to model complex data distributions effectively. The parameters $\theta$ of the GMM include the means, covariances, and mixture weights of the individual Gaussian components. This is a good choice, because it has been observed that linear projections of high-dimensional distributions onto low-dimensional spaces resemble Gaussian distributions, thie can partially be explained by the Central Limit Theorem.
+
+This leads us to the following algorithm for anomaly detection using PCA and GMMs:
+\begin{enumerate}
+    \item Project the data linearly onto a lower-dimensional space (using PCA)
+    \item Fit a GMM to the projected data 
+\end{enumerate}
+
+\subsection{Dimensionality Reduction}
+Given $X=\left\{x_1, \ldots, x_n\right\} \subseteq \mathbb{R}^D$, find a linear projection $\pi: \mathbb{R}^D \rightarrow \mathbb{R}^d$, with $d \ll D$, and such that $\pi(X)$ has a "sufficiently large" variance. So we want a projection $\pi$ that maximizes the variance of the projected data points.
+
+\subsubsection{First Stage}
+We start with a very tractable case which might be a bit too simple. We look for a one-dimensional projection $\pi(x) = w^T x$, where $w \in \mathbb{R}^D$ is a unit vector (i.e., $\|w\|_2 = 1$). The variance of the projected data points is given by:
+\begin{equation}
+    \text{Var}(\pi(X)) = \frac{1}{n} \sum_{i=1}^n (w^T x_i - w^T \mu)^2 = w^T \Sigma w
+\end{equation}
+where $\mu = \frac{1}{n} \sum_{i=1}^n x_i$ is the mean of the data points, and $\Sigma = \frac{1}{n} \sum_{i=1}^n (x_i - \mu)(x_i - \mu)^T$ is the covariance matrix of the data points.
+To find the optimal projection vector $w$, we need to solve the following optimization problem:
+\begin{equation}
+    \max_{w \in \mathbb{R}^D} w^T \Sigma w \quad \text{subject to} \quad \|w\|_2 = 1
+\end{equation}
+Where the solution is given by the eigenvector of $\Sigma$ corresponding to the largest eigenvalue.
+
+\subsubsection{General Case}
+To generalize this to a $d$-dimensional projection, we can define the projection as $\pi(x) = W^T x$, where $W \in \mathbb{R}^{D \times d}$ is a matrix with orthonormal columns (i.e., $W^T W = I_d$). We proceed similarly to the one-dimensional case, and we want to maximize the variance of the projected data points:
+\begin{equation}
+    \text{Var}(\pi(X)) = \frac{1}{n} \sum_{i=1}^n \|W^T x_i - W^T \mu\|_2^2 = \text{tr}(W^T \Sigma W)
+\end{equation}
+To find the optimal projection matrix $W$, we need to solve the following optimization problem:
+\begin{equation}
+    \max_{W \in \mathbb{R}^{D \times d}} \text{tr}(W^T \Sigma W) \quad \text{subject to} \quad W^T W = I_d
+\end{equation}
+The solution is given by the matrix $W$ whose columns are the eigenvectors of $\Sigma$ corresponding to the $d$ largest eigenvalues.
+
+\subsection{Fitting a GMM}
+\subsubsection{GMM Definition}
+A Gaussian Mixture Model (GMM) is a probabilistic model that assumes that the data is generated from a mixture of several Gaussian distributions. The probability density function of a GMM with $K$ components is given by:
+\begin{equation}
+    p(x; \theta) = \sum_{k=1}^K \pi_k \mathcal{N}(x; \mu_k, \Sigma_k)
+\end{equation}
+where $\pi_k$ are the mixture weights (with $\sum_{k=1}^K \pi_k = 1$ and $\pi_k \geq 0$), $\mu_k$ are the means, and $\Sigma_k$ are the covariance matrices of the individual Gaussian components. The parameters of the GMM are denoted by $\theta = \{\pi_k, \mu_k, \Sigma_k\}_{k=1}^K$.
+
+\subsection{Fitting}
+We again use a MLE approach, that is, we want to find the parameters $\hat{\theta}$ that maximize the likelihood of the observed data:
+\begin{align}
+    \log p_\theta(x) &= \log \prod_{i=1}^n p(x_i; \theta) \\
+    &= \sum_{i=1}^n \log p(x_i; \theta) \\
+     &= \sum_{i=1}^n \log \left( \sum_{k=1}^K \pi_k \mathcal{N}(x_i | \mu_k, \Sigma_k) \right)
+\end{align}
+
+However, this last term is difficult to optimize directly due to the presence of the logarithm of a sum. We make an interesting observation: if we knew which component generated each data point, the optimization would be much simpler. This leads us to introduce latent variables $z_i$ that indicate the component responsible for generating each data point $x_i$. Specifically, we define $z_i$ as a one-hot encoded vector where $z_{ik} = 1$ if the $i$-th data point was generated by the $k$-th component, and $0$ otherwise. With these latent variables, we can express the complete-data log-likelihood as:
+\begin{align}
+\log p_\theta(X, Z) & =\log p_\theta(Z) p_\theta(X \mid Z) \\
+& =\log p_\theta(Z)+\log p_\theta(X \mid Z) \\
+& =\sum_{i \leq n} \log \pi_{Z_i}+\sum_{i \leq n} \log p_\theta\left(X_i \mid Z_i\right)
+\end{align}
+Where $Z = \{z_1, \ldots, z_n\}$ is the set of latent variables for all data points. This is way easier to optimize.
+
+Now we have the setup, that we have $\log p_\theta(x)$ but we would like to work with $\log p_\theta(X, Z)$. We know that:
+\begin{align}
+     & \log p_\theta(x) = \log \frac{p_\theta(x, z)}{p_\theta(z | x)} \\
+    \Rightarrow & \mathbb E_{Z \sim q}[\log p_\theta(x)] = \mathbb E_{Z \sim q}\left[\log \frac{p_\theta(x, Z)}{p_\theta(Z | x)}\right] \\
+\end{align}
+Since the left-hand side does not depend on $Z$, we can write:
+\begin{align}
+    \log p_\theta(x) & = \mathbb E_{Z \sim q}\left[\log \frac{p_\theta(x, Z)}{p_\theta(Z | x)}\right] \\
+    & = \mathbb E_{Z \sim q}\left[\log \frac{p_\theta(x, Z)}{p_\theta(Z | x)} \cdot \frac{q(Z)}{q(Z)}\right] \\
+    & = \mathbb E_{Z \sim q}[\log p_\theta(x, Z)-\log q(Z)] + \mathbb E_{Z \sim q}\left[\log \frac{q(Z)}{p_\theta(Z | x)}\right] \\
+    & = M(q, \theta) + \text{KL}(q \| p_\theta(Z | x))
+\end{align}
+Where we defined:
+\begin{equation}
+    M(q, \theta) = \mathbb E_{Z \sim q}[\log p_\theta(x, Z)-\log q(Z)]
+\end{equation}
+This gives us a lower bound on the log-likelihood, since the KL divergence is always non-negative:
+\begin{equation}
+    \log p_\theta(x) \geq M(q, \theta)
+\end{equation}
+and we have equality if and only if $q(Z) = p_\theta(Z | x)$.
