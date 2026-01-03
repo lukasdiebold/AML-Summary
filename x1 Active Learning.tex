@@ -1,0 +1,98 @@
+\section{Active Learning}
+Labels are often far more expensive than unannotated data. Diagnosing rare diseases, auditing corporate fraud, or curating safety-critical driving scenarios all require expert feedback, yet only a small subset of examples truly shapes the model. Active learning asks how to collect a small but representative labeled sample under a strict budget by interactively choosing which points to query. This chapter develops three progressively richer settings:
+\begin{enumerate}
+    \item A transductive problem where we explicitly distinguish between the domain we can sample from and the target region where we aim to be accurate.
+    \item A safety-critical optimization problem in which only safe queries are admissible.
+    \item A batch selection task where labeling decisions are taken in groups using a coverage heuristic.
+\end{enumerate}
+We follow the same storyline: first define the information-theoretic principle, then demonstrate how it carries over to safe Bayesian optimization, and finally study the batch coverage formulation.
+
+\subsection{Transductive information gain}
+We start with the transductive view. The learner is handed a domain $\mathcal X$, a \emph{target} subset $\mathcal A \subseteq \mathcal X$ on which performance is ultimately measured, and a sample space $\mathcal S \subseteq \mathcal X$ that can actually be queried. Let $f$ be an unknown stochastic process indexed by $\mathcal X$. Observation noise is modeled via $y_x = f_x + \epsilon_x$, where $\epsilon_x$ is independent, mean-zero noise. At iteration $n$ we already collected
+\[
+    \mathcal D_{n-1} = \{(x_i, y_i)\}_{i < n} \subseteq \mathcal S \times \mathbb R,
+\]
+and the goal is to select $x_n \in \mathcal S$ such that the new datum $(x_n, y_{x_n})$ maximally informs us about $f$ over the target domain $\mathcal A$. This raises two central questions:
+\begin{itemize}
+    \item How do we quantify the information gain that a particular point provides?
+    \item Given this score, how do we efficiently pick $x_n \in \mathcal S$ to maximize it?
+\end{itemize}
+
+\subsection{Information-based transductive learning}
+Information-based transductive learning (ITL) answers both questions by selecting the point that maximizes the conditional mutual information between the new observation and the restriction of $f$ to $\mathcal A$:
+\[
+    x_n = \arg\max_{x \in \mathcal S} I\left(\left\{f_x\right\}_{x \in \mathcal{A}} ; y_x \mid \mathcal{D}_{n-1}\right)
+\]
+When $f \sim \mathcal{GP}(\mu, k)$ is a Gaussian process with known mean and kernel, the mutual information admits a closed form,
+\[
+    I\left(\left\{f_x\right\}_{x \in \mathcal{A}} ; y_x \mid \mathcal{D}_{n-1}\right)=\frac{1}{2} \log \left(\frac{\operatorname{Var}\left(y_x \mid \mathcal{D}_{n-1}\right)}{\operatorname{Var}\left(y_x \mid\left\{f_x\right\}_{x \in \mathcal{A}}, \mathcal{D}_{n-1}\right)}\right).
+\]
+The numerator is simply the predictive variance from the GP posterior—how uncertain we currently are about $y_x$ before revealing its label. The denominator measures what uncertainty would remain after conditioning on the entire target restriction $\{f_x\}_{x \in \mathcal A}$; it shrinks when labeling $x$ clarifies many points in $\mathcal A$. Therefore a large ratio pinpoints samples whose individual labels resolve substantial ambiguity precisely where performance matters. The logarithm turns this ratio into an additive gain, so selecting the point with the largest mutual information implements a principled exploration strategy that prioritizes variance reduction on $\mathcal A$ while respecting that we may only query within the feasible set $\mathcal S$.
+
+This completes the transductive core of the chapter: we now possess an acquisition functional that explicitly connects feasible sampling locations to a target region of interest. The following sections show how the very same ingredients—separate sample and target domains, plus an information-theoretic score—power safety-critical optimization and batch selection.
+
+\subsection{Safe Bayesian optimization}
+We next apply ITL to a safety-critical setting: we no longer merely want to reduce uncertainty on $\mathcal A$, we must also ensure that every experimental design point is safe. This leads to the safe Bayesian optimization problem of maximizing an unknown stochastic process $f^\star$ over $\mathcal X$:
+\[
+    x^\star = \arg\max_{x \in \mathcal X} \mathbb E[f^\star(x)],
+\]
+subject to the \emph{safe set} $\mathcal S^\star = \{x \in \mathcal X : g^\star(x) \geq 0\}$, where $g^\star$ is another stochastic process describing safety. Iteratively we gather observations $y_i = f^\star(x_i)$ and $z_i = g^\star(x_i)$ for $x_i \in \mathcal X$, but future samples must not violate the unknown constraint $g^\star(x) \geq 0$. The challenge is therefore to pick $x_n$ that improves our estimate of the maximum value while remaining in the safe region with high probability.
+
+\subsection{Safe Bayesian optimization via ITL}
+To enforce safety, we fit independent Gaussian processes to the objective and constraint observations. The GP posterior for $f^\star$ induces lower and upper confidence bounds $\ell_n^f(x)$ and $u_n^f(x)$ such that the posterior mean lies inside $[\ell_n^f(x), u_n^f(x)]$ with, say, $95\%$ probability; an analogous pair $\ell_n^g(x), u_n^g(x)$ is derived for $g^\star$.
+
+These confidence bounds define conservative and optimistic estimates of the safe region,
+\[
+    \mathcal S_n = \{x : \ell_n^g(x) \geq 0\}, \qquad
+    \hat{\mathcal S}_n = \{x : u_n^g(x) \geq 0\},
+\]
+and identify candidate maximizers through
+\[
+    \mathcal A_n = \Bigl\{x \in \hat{\mathcal S}_n : u_n^f(x)
+        \geq \max_{x' \in \mathcal S_n} \ell_n^f(x') \Bigr\}.
+\]
+The sample space is restricted to the provably safe set $\mathcal S_n$, whereas the target domain focuses on the optimistic maximizers $\mathcal A_n$. Applying ITL with $\mathcal S = \mathcal S_n$ guarantees that every query satisfies the safety constraint with high probability, because only points whose lower confidence bound remains non-negative are eligible. Simultaneously, setting $\mathcal A = \mathcal A_n$ targets those points most likely to improve the incumbent optimum—locations whose upper confidence bound could exceed the best certified value. Observe that the $\max_{x^{\prime} \in \mathcal{S}_n} \ell_n^f(x^{\prime})$ term is the best safe value known so far, so only points that might surpass it are included in $\mathcal A_n$.
+
+Having adapted the transductive principle to a safe sequential design problem, we now turn to a complementary constraint: labeling must sometimes occur in \emph{batches}. The underlying idea stays the same—identify a subset of examples whose labels will control the generalization error—but now the constraint is a fixed batch size rather than safety.
+
+\subsection{Batch active learning}
+Many labeling processes run in batches to leverage annotator availability. Suppose we are given an input domain $\mathcal X$ with distribution $P$ over it, oracle access to an unknown function $f : \mathcal X \to \mathcal Y$, a finite population $X = \{x_1, \dots, x_m\} \subseteq \mathcal X$, and a budget $b \leq m$. We must pick a subset $L \subseteq X$ of size $b$ and request labels $\{f(x) : x \in L\}$. The goal is to choose $L$ such that the learner trained on these labels generalizes well under $P$.
+
+\subsection{Auxiliary definitions}
+The batch formulation by Yehuda et al.\ (2022) relies on local homogeneity:
+\begin{itemize}
+    \item For $x \in \mathcal X$ and $\delta > 0$, the ball $B_\delta(x) = \{x' \in \mathcal X : \|x - x'\| \leq \delta\}$ is \emph{pure} if $f$ is constant on that ball.
+    \item For $L \subseteq \mathcal X$, define the covered region $C(L, \delta) = \bigcup_{x \in L} B_\delta(x)$. We write $C_r$ for the subset on which the $1$-nearest-neighbor classifier $\tilde f$ trained on $Z = \{(x, f(x)) : x \in L\}$ matches $f$, and $C_w$ for the disagreement region.
+    \item The impurity of radius $\delta$ is $\tilde \pi(\delta) = \mathbb P_{x \sim P}\bigl[B_\delta(x) \text{ is not pure}\bigr]$, a non-decreasing function of $\delta$.
+\end{itemize}
+If a point is misclassified by the 1-NN classifier, it must either lie outside the covered region or inside a non-pure ball. Hence,
+\[
+    \mathbb P_{x \sim P}\bigl[\tilde f(x) \neq f(x)\bigr]
+    \leq 1 - \mathbb P\bigl(C(L, \delta)\bigr) + \tilde \pi(\delta).
+\]
+Active learning therefore seeks $L$ and $\delta$ that minimize this upper bound. A practical strategy is to select $\delta$ first and then maximize the coverage probability $\mathbb P(C(L, \delta))$ under a budget constraint.
+
+\subsection{Coverage maximization and ProbCover}
+Given the bound above, we must solve
+\[
+    \max_{L \subseteq X,\, |L| = b} \mathbb P\Bigl(\bigcup_{x \in L} B_\delta(x)\Bigr),
+\]
+but two obstacles arise: the underlying distribution $P$ is unknown and the optimization problem is NP-hard. The fix proceeds in two steps:
+\begin{enumerate}
+    \item Approximate $P$ with the empirical distribution over $X$, which amounts to counting how many points lie inside the covered region.
+    \item Apply a greedy maximal-coverage heuristic known as \textsc{ProbCover}.
+\end{enumerate}
+Let $G = (X, E)$ be a graph with edges between points at distance at most $\delta$. \textsc{ProbCover} iteratively adds the point that covers the largest number of yet-uncovered neighbors:
+\begin{algorithmic}
+\State $L \gets \varnothing$
+\For{$i = 1$ to $b$}
+    \State $x^\star \gets \arg\max_{x \in X} |\{x' : (x, x') \in E,\, x' \text{ not yet covered}\}|$
+    \State $L \gets L \cup \{x^\star\}$
+    \State Remove all edges incident to points in $B_\delta(x^\star) \cap X$ (they need not be considered again)
+\EndFor
+\State \Return $L$
+\end{algorithmic}
+This greedy routine provides a logarithmic approximation guarantee for set coverage problems and serves as a practical batch active learning policy: small $\delta$ focuses on fine-grained distinctions (lower impurity, smaller coverage), whereas large $\delta$ broadens coverage but risks mixing labels. By tuning $\delta$ and $b$, we trade off robustness of the 1-NN classifier against the number of labels queried.
+
+\subsection{Summary}
+We began by splitting the world into a target region and a feasible sampling set, quantifying information gain through ITL. We then reused this perspective to design a safe Bayesian optimization loop where feasibility is enforced through GP confidence bounds, and finally transitioned to batch selection by casting informativeness as probabilistic coverage.
