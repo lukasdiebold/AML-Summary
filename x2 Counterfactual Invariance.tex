@@ -1,0 +1,107 @@
+\section{Counterfactual Invariance}
+Machine-learning estimators often achieve high accuracy for the wrong reasons. Spurious correlations, confounders, and unobserved interventions can create shortcuts that models exploit during training but that fail under distribution shift. Counterfactual invariance addresses this failure mode by demanding that a predictor remain stable when nuisance factors are changed while the underlying causal mechanism of interest is held fixed. This chapter develops the idea systematically: starting from motivating pathologies, we introduce the causal-graph machinery necessary to reason about counterfactual statements, derive formal conditions for counterfactual invariance in both causal and anti-causal regimes, and finally discuss how to enforce those conditions in practice.
+
+\subsection{Motivation: when correlations lie}
+Classical statistical anecdotes already hint at the perils of naive correlation chasing:
+\begin{itemize}
+    \item Observational studies once concluded that young children sleeping with a light on were more likely to develop myopia; later it was shown that myopic parents both left lights on and passed on their genetics.
+    \item Correlations between mozzarella consumption and doctorates awarded, or between lice and health, are artifacts of shared confounders rather than direct causation.
+    \item In medical imaging, Badgeley et al.\ found that a hip-fracture classifier had learned to use hospital-specific devices visible in X-rays rather than skeletal cues, leading to dramatic failures under domain shift.
+\end{itemize}
+These examples illustrate three recurring pitfalls: \emph{reverse causation} (target causes features), \emph{third-cause fallacies} (hidden confounders drive both feature and target), and \emph{shortcut learning} (models latch onto non-causal proxies). Counterfactual invariance seeks representations and predictors that respond only to the causal content of the data.
+
+\subsection{Shortcut learning and domain shifts}
+Shortcut learning arises when causal and spurious factors co-occur in the training data. Given two environments $\mathcal E_1$ and $\mathcal E_2$ whose feature distributions differ via nuisance features $W$, an estimator $f$ trained on $\mathcal E_1$ may exploit $W$ as a proxy for the label $Y$ rather than responding to the causal features $X$. At test time, a domain shift—either because $W$ changes distribution or because we deploy $f$ in a new environment—breaks this proxy, and accuracy collapses. The solution is to encode \emph{invariant representations}: features of $X$ that do not depend on the environment $W$ yet retain the signal about $Y$.
+
+\subsection{Counterfactuals and invariance}
+Let $X$ be a random feature vector representing an object, and let $Y$ be the target variable we wish to predict. Suppose we also observe a random vector $W$ capturing nuisance attributes: factors that may influence $X$ but should not influence the prediction rule. A counterfactual $X(w)$ is the feature vector we would observe if we were to intervene and set $W$ to the specific value $w$, leaving everything else unchanged. Formally, the intervention replaces the generative mechanism for $W$ with the constant $w$ while keeping the structural equations for other variables intact.
+
+\begin{definition}[Counterfactual invariance]
+A predictor $f$ is \emph{counterfactually invariant} with respect to $W$ if for any two values $w, w'$ in the range of $W$ and every realization of $X$ we have
+\[
+    f\bigl(X(w)\bigr) = f\bigl(X(w')\bigr).
+\]
+In words, if we edit the nuisance factors while holding everything else constant, the prediction remains unchanged.
+\end{definition}
+Intuitively, counterfactual invariance demands that $f$ ignore all pathways through which $W$ can influence the prediction except via the causal content shared across interventions.
+
+\subsection{Two causal regimes}
+The causal structure of the problem determines how we should enforce invariance. Two canonical regimes cover most applications:
+\begin{itemize}
+    \item \textbf{Causal regime.} Changing features $X$ has a causal effect on $Y$, e.g., in a medical-diagnosis setting where symptoms influence the disease classification. Here we typically assume $X \rightarrow Y$.
+    \item \textbf{Anti-causal regime.} The target $Y$ causes the features $X$, e.g., in disease detection where the disease (cause) produces observable symptoms (effects). Here we model $Y \rightarrow X$.
+\end{itemize}
+In both regimes the nuisance $W$ may influence $X$ but must not affect $Y$. The difference lies in whether $Y$ lies downstream or upstream of $X$ in the causal graph, which alters the conditional independences we can exploit.
+
+\subsection{Causal graphs and d-separation}
+To reason formally, we represent the relationships among $W$, $X$, $Y$, and latent variables through a causal graph. Nodes correspond to random variables, directed edges denote causal influence, and we assume the graph is a directed acyclic graph (DAG). For example, in the causal regime (where $X \rightarrow Y$) a minimal graph might include:
+\[
+    W \rightarrow X \rightarrow Y,
+\]
+with potential latent confounders $U$ influencing both $W$ and $X$, or selection variables $S$ governing which samples appear in the dataset. In the anti-causal regime, the edge direction flips: $Y \rightarrow X$, yet $W$ still influences $X$.
+
+Conditional independences implied by the graph are characterized via \emph{d-separation}. A path between two nodes is blocked if it contains:
+\begin{itemize}
+    \item A chain $A \to B \to C$, $A \leftarrow B \to C$, or $A \leftarrow B \leftarrow C$ where the middle node $B$ is conditioned on.
+    \item A collider $A \to B \leftarrow C$ where the middle node $B$ is \emph{not} conditioned on (nor any of its descendants).
+\end{itemize}
+If every path between two nodes is blocked given a conditioning set $Z$, the nodes are d-separated, implying conditional independence. This rule lets us derive necessary independences for counterfactual invariance.
+
+\paragraph{Intuition.}
+D-separation tracks whether there is still an ``open pipeline'' along which information can travel. In a chain or fork, every influence flowing from one endpoint to the other must pass through the middle node, so once we observe that node the pipeline is saturated—learning $B$ already captures everything $A$ could reveal about $C$. A practical fork example is a genetic mutation $B$ that simultaneously raises cholesterol $A$ and blood pressure $C$: before measuring the gene, high cholesterol hints at high blood pressure; after conditioning on the mutation, the endpoints decouple because their only link has been cut. Likewise, in the chain $C \to B \to A$ (smoking $\to$ tar buildup $\to$ chronic cough) conditioning on tar levels breaks the association between smoking and cough, because tar already summarizes whatever smoking would have conveyed. Colliders behave oppositely: two independent causes $A \to B \leftarrow C$ remain disconnected unless we observe the collision (e.g., conditioning on sneezing that can be caused by both a cold and allergies), in which case the path becomes active and learning one cause ``explains away'' the other.
+
+\subsection{Confounding and selection pitfalls}
+Two additional phenomena can break counterfactual invariance if unaddressed:
+\begin{itemize}
+    \item \textbf{Confounding.} Hidden variables $U$ that influence both $W$ and $X$ (or $Y$) create associations that do not disappear under interventions. Simpson's paradox—where aggregated data reverses the trend observed within subgroups—is a textbook manifestation.
+    \item \textbf{Selection bias.} Conditioning on a selection variable $S$ that depends on $W$ and $X$ introduces collider bias: even independent variables become correlated when we restrict attention to samples with $S=1$ (e.g., only applicants on LinkedIn).
+\end{itemize}
+Accounting for these effects requires either modeling the hidden variables explicitly or designing algorithms that enforce the necessary conditional independences despite selection.
+
+\subsection{Necessary conditions for invariance}
+Counterfactual invariance imposes specific conditional independence relations on $f(X)$. Intuitively, if $f$ ignores $W$ even under interventions, then after conditioning on the causal parents, the prediction cannot leak information about $W$. The following conditions are necessary:
+\begin{itemize}
+    \item \textbf{Anti-causal scenario:} $f(X) \perp W \mid Y$. Once we know the true label $Y$, the prediction $f(X)$ must reveal nothing about the nuisance $W$. Otherwise, altering $W$ while holding $Y$ fixed would change $f$.
+    \item \textbf{Causal scenario without selection:} $f(X) \perp W$. Because $Y$ is downstream of $X$, any dependence on $W$ indicates that $f$ has retained nuisance information.
+    \item \textbf{Causal scenario with selection bias:} If selection variables $S$ depend on both $W$ and $X$, then colliders induced by conditioning on $S=1$ can reintroduce spurious correlations. In this case, a conservative requirement is $f(X) \perp W \mid Y$, provided that $Y$ does not depend on the selection mechanism once $X$ and $W$ are fixed.
+\end{itemize}
+Below we sketch why these conditions follow from d-separation.
+
+\paragraph{Anti-causal proof sketch.}
+Assume $Y \rightarrow X$ and $W \rightarrow X$, possibly with confounders capturing unobserved causes of $W$ and $Y$. Counterfactual invariance means $f(X)$ only depends on the portion of $X$ that remains invariant under interventions on $W$, typically written as $X_{ W}^\perp$. In the anti-causal graph, every path from $X_{W}^\perp$ to $W$ is blocked once we condition on $Y$: colliders opened by $Y$ are observed, while colliders through latent variables remain unobserved and thus block the path. Therefore, if $f$ only uses $X_{W}^\perp $, we must have $f(X) \perp W \mid Y$.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.3\textwidth]{images/anticausal.png}
+  \caption{Anti-causal regime}
+  \label{fig:anticausal}
+\end{figure}
+
+\paragraph{Causal proof sketch.}
+When $X \rightarrow Y$, $f$ can depend on $X$ directly. Yet to be invariant, $f$ must ignore all components of $X$ that are influenced by $W$. In the absence of selection, the graph ensures that every path from $X_{W}^\perp $ to $W$ goes through a collider—either $X_{W \& Y}$ or $Y$ itself—that is not observed. Consequently, the residual representation cannot correlate with $W$, leading to the unconditional independence $f(X) \perp W$. If we condition on a selection variable, some paths may become unblocked, so we revert to the more cautious requirement conditioned on $Y$.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.3\textwidth]{images/causal.png}
+  \caption{Causal regime}
+  \label{fig:causal}
+\end{figure}
+
+\subsection{Enforcing invariance via distribution matching}
+The independence conditions can be operationalized by matching the distributions of the predictions across environments. Consider the anti-causal setting with binary $W$ and $Y$. Counterfactual invariance demands
+\[
+    f(X) \mid \{W = w,\, Y = y\} \quad \stackrel{d}{=} \quad f(X) \mid \{W = w',\, Y = y\}
+\]
+for all $w, w', y$. In practice we can:
+\begin{enumerate}
+    \item Choose a discrepancy measure $\Delta(p, q)$ between probability distributions (e.g., maximum mean discrepancy, Wasserstein distance, or KL divergence).
+    \item Add a regularization term that penalizes discrepancies between the empirical distributions of $f(X)$ across the nuisance groups conditioned on $Y$:
+    \[
+        \mathcal L_{\text{inv}} = \sum_{y} \sum_{w, w'} \Delta\Bigl( \hat p\bigl(f(X) \mid W=w, Y=y\bigr),\; \hat p\bigl(f(X) \mid W=w', Y=y\bigr) \Bigr).
+    \]
+    \item Optimize the predictor to minimize the original task loss plus $\lambda \mathcal L_{\text{inv}}$, where $\lambda$ balances task fit and invariance.
+\end{enumerate}
+This strategy enforces that, within each class $y$, the representation used by $f$ carries no information about the nuisance. Extensions include adversarial training where a discriminator tries to predict $W$ from the learned representation while the encoder attempts to fool it, or explicit data augmentation with synthetically generated counterfactuals when such interventions are available.
+
+\subsection{Summary}
+Counterfactual invariance provides a principled remedy for shortcut learning. By explicitly modeling the nuisance factors $W$, constructing counterfactuals $X(w)$, and reading off the necessary conditional independences from causal graphs, we can reason about when a predictor truly focuses on causal features. Enforcing these independences—through distribution matching, adversarial debiasing, or counterfactual augmentation—yields models whose predictions remain stable even when environments shift. In domains where decisions must rest on the right reasons, such invariance is not merely desirable; it is essential.
