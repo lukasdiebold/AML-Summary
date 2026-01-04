@@ -1,0 +1,1 @@
+write a chapter on ... based on the slides, add detailed explanations for results, especially if they are just given, also try to convey intuition. take care that there is an overall narrative structure to the chapter, do not mention the slides
