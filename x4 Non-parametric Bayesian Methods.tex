@@ -1,0 +1,181 @@
+\section{Non-parametric Bayesian Methods}
+
+How can we endow probabilistic models with enough flexibility to grow with the data instead of committing to a fixed number of parameters? Non-parametric Bayesian methods answer this question by replacing finite-dimensional priors with distributions over infinite-dimensional objects such as probability measures. This chapter traces the path from Bayesian inference for a single Gaussian to Gaussian mixture models (GMMs) with an unbounded number of clusters, highlighting the role of conjugate priors, Gibbs sampling, Dirichlet processes, and exchangeability.
+
+\subsection{Warm-up: Bayesian inference for a single Gaussian}
+Consider one-dimensional observations $X = \{x_1, \ldots, x_n\}$ drawn i.i.d.\ from $\mathcal N(\mu, \sigma^2)$ with known variance $\sigma^2=1$ but unknown mean $\mu$. Bayesians update a prior belief $\mu \sim \mathcal N(m_0, k_0^{-1})$ via Bayes' rule:
+\[
+p(\mu \mid X) \propto p(X \mid \mu) \, p(\mu) = \left( \prod_{i=1}^n \mathcal N(x_i \mid \mu, 1)\right) \mathcal N(\mu \mid m_0, k_0^{-1}).
+\]
+Because Gaussians are conjugate to themselves, the posterior remains Gaussian with parameters
+\[
+m_n = \frac{k_0 m_0 + n \bar x}{k_0 + n}, \qquad k_n = k_0 + n,
+\]
+where $\bar x$ is the sample mean. Intuitively, $k_0$ quantifies how confident we were in $m_0$; after seeing $n$ data points, the precision simply adds up. The posterior mean $m_n$ is a weighted average between the prior mean and the data mean, showcasing regularization against outliers and a principled notion of uncertainty.
+
+\subsection{Multivariate Gaussians and conjugate priors}
+For $d$-dimensional data $x_i \sim \mathcal N(\mu, \Sigma)$ with both $\mu$ and $\Sigma$ unknown, the normal-inverse-Wishart (NIW) distribution is a conjugate prior whose hyperparameters carry clear meaning: 
+\begin{itemize}
+    \item $m_0 \in \mathbb{R}^d$: prior mean vector,
+    \item $k_0 > 0$: scaling factor controlling confidence in $m_0$,
+    \item $S_0 \in \mathbb{R}^{d \times d}$: scale matrix encoding prior beliefs about covariance structure,
+    \item $\nu_0 > d - 1$: degrees of freedom, controlling confidence in $S_0$.
+\end{itemize}
+Crucially, the inverse-Wishart component enforces that sampled covariance matrices remain positive semi-definite, which is required for any valid multivariate Gaussian. The NIW density is
+\[
+p(\mu, \Sigma) = \operatorname{NIW}(\mu, \Sigma \mid m_0, k_0, S_0, \nu_0).
+\]
+Given a dataset $X$, Bayes' rule yields the posterior
+\[
+p(\mu, \Sigma \mid X) = \operatorname{NIW}(m_n, k_n, S_n, \nu_n),
+\]
+with updates
+\[
+\begin{aligned}
+k_n &= k_0 + n, \qquad &\nu_n &= \nu_0 + n,\\
+m_n &= \frac{k_0 m_0 + n \bar x}{k_0 + n}, \qquad &S_n &= S_0 + S_X + \frac{k_0 n}{k_0 + n} (\bar x - m_0)(\bar x - m_0)^\top,
+\end{aligned}
+\]
+where $S_X$ is the sample covariance matrix. Only sufficient statistics (mean and covariance) are required, making posterior updates computationally light even for large $n$.
+
+\subsection{Sampling with semi-conjugate priors}
+Fully conjugate priors are convenient but sometimes too rigid—for instance, we may want to express separate beliefs about the location and spread of the data. Under an NIW prior the strength of the prior mean and the tightness of the covariance are linked through $k_0$, so tightening one automatically tightens the other. Semi-conjugate priors break this coupling while keeping \emph{conditionally} conjugate updates, which is all Gibbs sampling needs. A typical choice specifies
+\[
+\mu \sim \mathcal N(m_0, V_0), \qquad \Sigma \sim \operatorname{IW}(S_0, \nu_0),
+\]
+so the joint density no longer has a closed form but the conditional posteriors do. The
+Given current samples, Gibbs sampling iterates:
+\[
+\mu \mid \Sigma, X \sim \mathcal{N}\left(m_p, V_p\right)
+\]
+\[
+\Sigma \mid \mu, X \sim \operatorname{IW}\left(S_p, v_p\right)
+\]
+Each step has the same flavor as the fully conjugate update: the data provide sufficient statistics, while the prior contributes virtual observations. Even though the joint posterior $p(\mu, \Sigma \mid X)$ cannot be written explicitly, the Markov chain that alternates these two conditional draws converges to it under mild conditions. Practical samplers further exploit graphical- model independencies (via d-separation) and Rao-Blackwellization to reduce variance and shorten burn-in.
+
+\paragraph{Gibbs sampler details.}
+A single Gibbs sweep for this semi-conjugate model proceeds as follows:
+\begin{enumerate}
+    \item Given the current covariance sample $\Sigma^{(t)}$, draw a new mean by sampling $\mu^{(t+1)}$ from the Gaussian conditional above (using $\Sigma^{(t)}$ inside the formula).
+    \item Plug $\mu^{(t+1)}$ into the inverse-Wishart conditional to draw the next covariance sample $\Sigma^{(t+1)}$.
+    \item Repeat these two steps for many iterations, discarding the first $T_{\text{burn}}$ draws as burn-in and optionally thinning the remainder.
+\end{enumerate}
+Because each conditional depends on the latest value of the other block, the chain ``zig-zags'' through the $(\mu, \Sigma)$ space but still converges to the true joint posterior. Conditional independence structure (e.g., between clusters in a mixture) allows updating blocks in parallel or integrating out nuisance variables before running the sampler.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.6\textwidth]{images/gibbs.png}
+    \caption{Gibbs sampling illustration.}
+    \label{fig:gibbs_sampling}
+\end{figure}
+
+\subsection{Gibbs sampling in a nutshell}
+Whenever the posterior $p(\Theta \mid X)$ factorizes into conditionals that are easy to sample from, \emph{Gibbs sampling} provides a route to approximate inference even if the joint density is intractable. Let $\Theta = (\Theta_1, \ldots, \Theta_\ell)$ be the latent variables of interest. Gibbs sampling constructs a Markov chain $\{\Theta^{(t)}\}_{t=0}^\infty$ by iterating:
+\begin{enumerate}
+    \item Initialize $\Theta^{(0)}$ arbitrarily (e.g., random cluster assignments).
+    \item For $t = 0,1,2,\ldots$:
+    \begin{enumerate}
+        \item Sample $\Theta_1^{(t+1)} \sim p(\Theta_1 \mid \Theta_2^{(t)}, \ldots, \Theta_\ell^{(t)}, X)$.
+        \item Sample $\Theta_2^{(t+1)} \sim p(\Theta_2 \mid \Theta_1^{(t+1)}, \Theta_3^{(t)}, \ldots, \Theta_\ell^{(t)}, X)$.
+        \item Continue cycling through all coordinates until $\Theta_\ell^{(t+1)}$ is sampled given the most recent values of the others.
+    \end{enumerate}
+\end{enumerate}
+Each conditional draw is typically conjugate (or otherwise tractable) because all variables except one are held fixed. Under mild regularity conditions this Markov chain has $p(\Theta \mid X)$ as its stationary distribution, so samples collected after a burn-in period approximate the true posterior. In practice we discard the first $T_\text{burn}$ iterations, then thin or average the remaining ones to estimate expectations. The method shines in models such as GMMs where conditionals like $p(z_i \mid z_{-i}, \pi, \mu, \Sigma, X)$ or $p(\mu_k, \Sigma_k \mid z, X)$ admit closed forms.
+
+\begin{figure}[ht]
+    \centering
+    \begin{tikzpicture}[node distance=2.2cm, >=stealth, thick, scale=0.85, every node/.style={transform shape}]
+        \node[draw, rounded corners, fill=blue!10, minimum width=2.2cm, minimum height=1.2cm] (thetaone) {$\Theta_1^{(t+1)}$};
+        \node[draw, rounded corners, fill=green!10, minimum width=2.2cm, minimum height=1.2cm, right=of thetaone] (thetatwo) {$\Theta_2^{(t+1)}$};
+        \node[draw, rounded corners, fill=orange!10, minimum width=2.2cm, minimum height=1.2cm, right=of thetatwo] (thetak) {$\Theta_\ell^{(t+1)}$};
+        \node[above=0.25cm of thetaone] {\scriptsize $p(\Theta_1 \mid \Theta_{2:\ell})$};
+        \node[above=0.25cm of thetatwo] {\scriptsize $p(\Theta_2 \mid \Theta_{1},\Theta_{3:\ell})$};
+        \node[above=0.25cm of thetak] {\scriptsize $p(\Theta_\ell \mid \Theta_{1:\ell-1})$};
+        \draw[->] (thetaone) -- node[above] {\scriptsize update} (thetatwo);
+        \draw[->] (thetatwo) -- node[above] {\scriptsize $\cdots$} (thetak);
+        % \draw[->, bend left=40] (thetak.north east) to node[above] {\scriptsize $t+1 \rightarrow t+2$} ([yshift=0.5cm]thetaone.north west);
+        \draw[->, bend left=20] (thetak.south) to  node[above] {\scriptsize repeat} (thetaone.south);
+    \end{tikzpicture}
+    \caption{Gibbs Sampling}
+    \label{fig:gibbs_cycle}
+\end{figure}
+
+% Rest is not part of the exam
+
+% \subsection{Bayesian inference for finite Gaussian mixtures}
+% A $K$-component GMM introduces latent labels $z_i \in \{1, \ldots, K\}$ and cluster-specific parameters $(\mu_k, \Sigma_k)$ with mixing proportions $\pi_k$. A standard Bayesian specification is
+% \[
+% \begin{aligned}
+% \pi &\sim \operatorname{Dir}(\alpha_0, \ldots, \alpha_0),\\
+% \mu_k, \Sigma_k &\sim \operatorname{NIW}(m_0, k_0, S_0, \nu_0), \qquad k=1,\ldots,K,\\
+% z_i \mid \pi &\sim \operatorname{Categorical}(\pi),\\
+% x_i \mid z_i, \{\mu_k, \Sigma_k\} &\sim \mathcal N(\mu_{z_i}, \Sigma_{z_i}).
+% \end{aligned}
+% \]
+% Gibbs sampling alternates between:
+% \begin{enumerate}
+%     \item Sampling cluster assignments $z_i$ given $\pi$ and current Gaussian parameters. Using Bayes' rule and d-separation, the conditional is proportional to
+%     \[
+%     p(z_i = k \mid z_{-i}, \pi, X, \{\mu_k, \Sigma_k\}) \propto \pi_k \, \mathcal N(x_i \mid \mu_k, \Sigma_k).
+%     \]
+%     \item Sampling $\pi$ from its conditional Dirichlet distribution with counts $n_k$.
+%     \item Sampling each $(\mu_k, \Sigma_k)$ from the NIW posterior conditioned on points assigned to cluster $k$.
+% \end{enumerate}
+% The strong coupling between parameters and labels, however, can slow mixing. Collapsed Gibbs sampling marginalizes out $\pi, \mu_k, \Sigma_k$ analytically using conjugacy, yielding more efficient sampling over $\{z_i\}$ alone. Rao-Blackwell's theorem guarantees that such marginalization reduces estimator variance compared to sampling all variables explicitly.
+
+% \subsection{From fixed to unbounded clusters}
+% Setting $K$ requires prior knowledge and often leads to either underfitting (if $K$ is too small) or overfitting (if $K$ is too large). Non-parametric Bayesian modeling removes this bottleneck by allowing a potentially infinite number of clusters, yet ensuring that only finitely many are used for any finite dataset. The Dirichlet process (DP) is the key ingredient. Formally, a DP with base distribution $H$ and concentration $\alpha>0$ is a distribution over probability measures $G$ such that for any measurable partition $(T_1, \ldots, T_m)$ of the sample space,
+% \[
+% (G(T_1), \ldots, G(T_m)) \sim \operatorname{Dir}(\alpha H(T_1), \ldots, \alpha H(T_m)).
+% \]
+% Draws from a DP are discrete with probability one, making them ideal priors over mixture weights when the number of components is unknown.
+
+% \subsection{Chinese restaurant process intuition}
+% The \emph{Chinese restaurant process} (CRP) is a distribution over partitions that emerges when integrating out the random measure $G$ in a DP mixture model. Imagine customers (data points) entering a restaurant with infinitely many tables (clusters). The $i$-th customer sits at an occupied table $k$ with probability proportional to the number $n_k$ of customers already there, or starts a new table with probability proportional to $\alpha$:
+% \[
+% p(z_i = k \mid z_{1:i-1}) =
+% \begin{cases}
+% \frac{n_k}{\alpha + i - 1}, & \text{existing table } k,\\[4pt]
+% \frac{\alpha}{\alpha + i - 1}, & \text{new table}.
+% \end{cases}
+% \]
+% This simple rule balances reinforcement (popular tables attract more customers) with innovation controlled by $\alpha$. The expected number of occupied tables after $n$ customers is $\mathcal O(\alpha \log n)$, ensuring growth is sublinear in the data size.
+
+% \subsection{Dirichlet process Gaussian mixtures}
+% Combining the CRP prior over partitions with Gaussian emission distributions yields the Dirichlet process Gaussian mixture model (DP-GMM). One generative story proceeds as follows:
+% \begin{enumerate}
+%     \item Draw mixture weights $G \sim \operatorname{DP}(\alpha, H)$, where $H$ is typically the NIW prior over Gaussian parameters.
+%     \item For each cluster, draw $(\mu_k, \Sigma_k) \sim H$.
+%     \item For each datapoint, sample a cluster index $\theta_i \sim G$ and then $x_i \sim \mathcal N(\mu_{\theta_i}, \Sigma_{\theta_i})$.
+% \end{enumerate}
+% Integrating out $G$ induces CRP-style probabilities over the $\theta_i$.
+
+% Collapsed Gibbs sampling for a DP-GMM mirrors the finite case but replaces the multinomial counts with the CRP partition structure. Specifically, the conditional distribution of $z_i$ given the other assignments and data is proportional to:
+% \[
+% p(z_i = k \mid z_{-i}, X) \propto
+% \begin{cases}
+% (n_{k,-i})\, p(x_i \mid X_{k,-i}) & \text{existing cluster } k,\\[4pt]
+% \alpha \int p(x_i \mid \theta) \, H(d\theta) & \text{new cluster,}
+% \end{cases}
+% \]
+% where $p(x_i \mid X_{k,-i})$ is the posterior predictive under cluster $k$ with $x_i$ excluded. The second term—the integral over the base measure—has a closed-form expression under conjugate choices (e.g., NIW), making sampling practical.
+
+% \subsection{Stick-breaking construction}
+% An alternative perspective on the DP is the stick-breaking process. Draw independent $v_k \sim \operatorname{Beta}(1, \alpha)$ and define weights
+% \[
+% \pi_k = v_k \prod_{j<k} (1 - v_j), \qquad k = 1, 2, \ldots
+% \]
+% The weights sum to one almost surely, resembling the act of repeatedly breaking off a random fraction of a unit-length stick. The stick-breaking view clarifies how the concentration parameter $\alpha$ affects sparsity: small $\alpha$ leads to a few large weights, while large $\alpha$ spreads mass over many components.
+
+% \subsection{Exchangeability and De Finetti's theorem}
+% Although CRP assignments are not independent, they are exchangeable: any permutation of the order in which customers arrive yields the same joint distribution. De Finetti's theorem explains this phenomenon by stating that exchangeable sequences are mixtures of i.i.d.\ sequences. In the DP-GMM context, the latent measure $G$ plays the role of the mixing measure; conditioning on $G$ makes the $\theta_i$ i.i.d. This viewpoint legitimizes the CRP as a consistent prior over partitions and ensures that posterior inference does not depend on the arbitrary ordering of data.
+
+% \subsection{Putting it all together}
+% Non-parametric Bayesian methods extend the strengths of finite Bayesian models—uncertainty quantification, principled regularization, and compatibility with probabilistic programming—to scenarios where capacity must adapt to data complexity. The workflow is:
+% \begin{enumerate}
+%     \item Specify conjugate base measures (e.g., NIW for Gaussian emissions) to keep posterior predictives tractable.
+%     \item Use collapsed Gibbs sampling to integrate out nuisance parameters and sample only the essential latent variables (cluster assignments). Rao-Blackwellization reduces variance and accelerates convergence.
+%     \item Interpret the resulting assignments through the lens of the CRP or stick-breaking to understand how $\alpha$ influences cluster proliferation.
+%     \item Leverage exchangeability to justify that inferences do not depend on data ordering, paving the way for streaming variants.
+% \end{enumerate}
+% The result is a flexible model that discovers the appropriate number of clusters on the fly, resists overfitting by sharing statistical strength through priors, and retains the interpretability of Bayesian posteriors over both parameters and structure.
