@@ -1,0 +1,100 @@
+\section{Probably Approximately Correct Learning}
+
+Probably Approximately Correct (PAC) learning formalizes the intuition that a model should capture the regularities in the data-generating process, not just the accidents of a finite dataset. The framework asks how much data a learning algorithm needs before the hypothesis it outputs generalizes, and it does so without assuming a particular distribution for the inputs.
+
+\subsection{From Empirical Patterns to Guarantees}
+Every supervised learning pipeline starts from a labeled sample $Z = \{(x_i, y_i)\}_{i=1}^n$ drawn from an unknown distribution. Fitting a hypothesis that performs well on $Z$ is easy; guaranteeing that the same hypothesis will predict unseen examples demands more structure. Statistical learning theory introduces the \emph{generalization error}
+\[
+    R(\hat{c}) = \mathbb{P}_{X \sim D}\bigl(\hat{c}(X) \neq c(X)\bigr),
+\]
+which measures how often hypothesis $\hat{c}$ disagrees with the (unknown) target concept $c$ under the true distribution $D$ on the instance space $\mathcal{X}$. Because $D$ and $c$ are inaccessible, the learner minimizes the empirical error
+\[
+    \widehat{R}_n(\hat{c}) = \frac{1}{n} \sum_{i=1}^n \mathbb{I}\{\hat{c}(x_i) \neq y_i\},
+\]
+hoping that $\widehat{R}_n$ is a faithful estimate of $R$. PAC learning quantifies when this hope is justified.
+
+\subsection{Instance, Concept, and Hypothesis Spaces}
+An \emph{instance space} $\mathcal{X}$ enumerates all objects the learner may observe. A \emph{concept} $c$ is a subset of $\mathcal{X}$ or, equivalently, a label function $c: \mathcal{X} \rightarrow \{0,1\}$. A \emph{concept class} $\mathcal{C}$ collects candidate targets, whereas a \emph{hypothesis class} $\mathcal{H}$ contains the functions the algorithm is allowed to output. The learner receives $Z$ with labels $y_i = c(x_i)$ (realizable setting) or draws from a distribution on $\mathcal{X} \times \{0,1\}$ (agnostic setting) and must pick $\hat{c} \in \mathcal{H}$ that approximates $c$.
+
+\subsection{The PAC Criterion}
+A learning algorithm $A$ is a PAC learner for concept class $\mathcal{C}$ if there exists a polynomial $p$ such that for any distribution $D$ on $\mathcal{X}$, any tolerance parameters $0 < \varepsilon, \delta < 1/2$, and any target $c \in \mathcal{C}$, the algorithm produces $\hat{c} \in \mathcal{H}$ satisfying
+\[
+    \mathbb{P}_{Z \sim D^n}\left(R(\hat{c}) \leq \varepsilon\right) \geq 1 - \delta
+\]
+whenever it receives at least $n \geq p(1/\varepsilon, 1/\delta, \text{size}(c))$ samples. The polynomial captures \emph{sample complexity}; $\varepsilon$ controls accuracy, and $\delta$ controls confidence. Efficient PAC learners also run in time polynomial in the same quantities.
+
+\subsection{Axis-Aligned Rectangles as a Running Example}
+To build intuition, consider $\mathcal{X} = \mathbb{R}^2$ and let $\mathcal{C}$ be all axis-aligned rectangles. Given positive and negative labeled points, a natural learner outputs $\hat{R}$, the smallest rectangle containing every positive sample. 
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{images/PAC_1.png}
+    \caption{Axis-aligned rectangle learning: the smallest rectangle $\hat{R}$ containing all positive samples.}
+    \label{fig:PAC_1}
+\end{figure}
+
+Intuitively, this rectangle expands just enough to explain the data, so it should not misclassify too many points outside the observed cloud. The theory turns this intuition into a guarantee.
+
+Partition the true rectangle $R$ into four thin \emph{strips}: upper, lower, left, and right, each with probability mass $\varepsilon/4$ under $D$. Let the event $\hat{R}_{\text{IG}}$ denote that the learned rectangle intersects all strips (``IG'' for \emph{is good}). If a strip is missed, that entire portion of $R$ will be falsely labeled negative, contributing at least $\varepsilon/4$ error. Conversely, intersecting every strip ensures that the area where $\hat{R}$ differs from $R$ has probability at most $\varepsilon$.
+
+The key insight is that if the learned rectangle $\hat{R}$ misses any strip, it will incur large error. We formalize this by analyzing the probability that $\hat{R}$ intersects all four strips.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{images/PAC_2.png}
+    \caption{Partitioning the true rectangle into four strips, each with probability mass $\varepsilon/4$.}
+    \label{fig:PAC_2}
+\end{figure}
+
+\begin{derivation}
+The chance a fixed strip receives no sample is $(1 - \varepsilon/4)^n \leq \exp(-n\varepsilon/4)$ by $1+x \leq e^x$. A union bound over the four strips yields
+\[
+    \mathbb{P}\left(\hat{R}_{\text{IG}}\right) \geq 1 - 4 \exp\left(-\frac{n\varepsilon}{4}\right).
+\]
+On $\hat{R}_{\text{IG}}$, the symmetric difference $R \triangle \hat{R}$ has probability at most $\varepsilon$, so
+\[
+    \mathbb{P}\bigl(R(\hat{R}) \leq \varepsilon\bigr) \geq \mathbb{P}\left(\hat{R}_{\text{IG}}\right).
+\]
+Intuitively, intersecting every strip forces $\hat{R}$ to stretch all the way to each face of the true rectangle: if it were to stop short (say, at the top), it would exclude the sample that witnessed that strip, contradicting minimality. Consequently the only region where $R$ and $\hat{R}$ can disagree is confined to the four strips themselves, whose total probability mass is at most $\varepsilon$. Bounding the disagreement set is therefore equivalent to bounding $R(\hat{R})$.
+
+It suffices to set $n \geq \tfrac{4}{\varepsilon} \log \tfrac{4}{\delta}$ to make the failure probability at most $\delta$. The dependence is logarithmic in $1/\delta$ and linear in $1/\varepsilon$, exactly the scaling promised by the PAC definition.
+\end{derivation}
+
+\subsection{Finite Hypothesis Classes and Consistency}
+When $\mathcal{H}$ is finite and the algorithm outputs a hypothesis consistent with the sample ($\widehat{R}_n(\hat{c}) = 0$), geometry no longer matters. Every $h \in \mathcal{H}$ with true error $R(h) > \varepsilon$ must mislabel at least an $\varepsilon$-fraction of the instance space. A consistent learner can select such an $h$ only if none of the $n$ examples land inside its error region, an event with probability at most $\exp(-n\varepsilon)$ by independence. Applying a union bound over all $|\mathcal{H}|$ bad hypotheses yields
+\[
+    \mathbb{P}\bigl(R(\hat{c}) > \varepsilon\bigr) \leq |\mathcal{H}| \exp(-n\varepsilon).
+\]
+
+Equivalently, for any $\delta > 0$, it suffices to take
+\[
+    n \geq \frac{1}{\varepsilon}\left(\log |\mathcal{H}| + \log \frac{1}{\delta}\right)
+\]
+to guarantee $R(\hat{c}) \leq \varepsilon$ with probability at least $1 - \delta$. The logarithmic dependence on $|\mathcal{H}|$ demonstrates that even exponentially large hypothesis spaces can be learnable, provided the algorithm searches them effectively.
+
+\subsection{Agnostic PAC Learning and Bayes Risk}
+The realizable assumption breaks when identical feature vectors carry different labels, as in noisy measurement regimes. In this \emph{agnostic} scenario the benchmark is the Bayes optimal classifier $c_{\text{Bayes}}(x) = \arg\max_{y \in \{0,1\}} \mathbb{P}(y \mid x)$ with minimal achievable risk $R^\star$. Unlike the realizable case, no algorithm can guarantee error below $R^\star$ if the true labeling rule lies outside the hypothesis class. Instead we ask the learner to track the best rule available inside $\mathcal{C}$.
+
+A hypothesis class $\mathcal{C}$ is agnostically PAC learnable if there exists $A$ that, for every distribution on $\mathcal{X} \times \{0,1\}$ and every $\varepsilon,\delta$, outputs $\hat{c}$ with
+\[
+    \mathbb{P}\left(R(\hat{c}) - \inf_{c \in \mathcal{C}} R(c) \leq \varepsilon\right) \geq 1 - \delta.
+\]
+The learner now competes with the best function inside $\mathcal{C}$ rather than with the Bayes classifier itself. This shift has two consequences: (i) the comparison point is $R^\star_{\mathcal{C}} := \inf_{c \in \mathcal{C}} R(c)$, the approximation error induced by the hypothesis class, and (ii) the sample complexity typically increases because the learner must control both estimation error (difference between $\hat{c}$ and the empirical minimizer) and approximation error (difference between $R^\star_{\mathcal{C}}$ and the true Bayes risk). The guarantee above quantifies how many samples suffice to push the estimation error down to $\varepsilon$, whatever the irreducible noise may be.
+
+\subsection{Controlling Complexity via VC Dimension}
+For infinite hypothesis classes, cardinality-based bounds break down: plugging $|\mathcal{H}| = \infty$ into the finite-class estimate yields no information, and even countably infinite classes defeat a naive union bound because one must sum probabilities over infinitely many ``bad'' hypotheses. The \emph{Vapnik--Chervonenkis (VC) dimension} provides a refined measure of capacity in this regime. Shattering captures the idea of flexibility: a set $A \subseteq \mathcal{X}$ is \emph{shattered} by $\mathcal{C}$ if every possible labeling of $A$ can be realized by some $c \in \mathcal{C}$. The VC dimension $\mathrm{VC}_\mathcal{C}$ is the size of the largest shattered set.
+
+Examples give intuition about how geometry restricts shattering power:
+\begin{itemize}
+    \item Any two points in $\mathbb{R}^2$ can be shattered by axis-aligned rectangles.
+    \item Intervals on the real line shatter any two points but not all triples.
+    \item Certain triples in $\mathbb{R}^3$ are shattered by rectangles, but not every triple, placing $\mathrm{VC}_\mathcal{C}$ between two and three.
+\end{itemize}
+Finite VC dimension ensures that empirical risk minimization cannot overfit arbitrarily: the number of distinct labelings induced on any sample grows polynomially with $n$, so concentration inequalities still control the gap between empirical and true risk. Formally, if $\mathrm{VC}_\mathcal{C} < \infty$, empirical risk minimization achieves
+\[
+    \mathbb{P}\left(R(\hat{c}_n^\ast) - \inf_{c \in \mathcal{C}} R(c) > \varepsilon\right) \leq 9 n^{\mathrm{VC}_\mathcal{C}} \exp\left(-\frac{n\varepsilon^2}{32}\right),
+\]
+which tends to zero as $n$ grows. Thus finite VC dimension is both necessary and sufficient for PAC learnability in many settings.
+
+\subsection{Strong and Weak Learning Perspectives}
+The PAC condition can be relaxed to \emph{weak learning}: instead of demanding arbitrarily small $\varepsilon$, one requires $R(\hat{c}) \leq \tfrac{1}{2} - \gamma$ for some fixed $\gamma > 0$ with high probability. Weak learners are tractable building blocks for ensemble methods such as boosting, which combine many slightly better-than-random hypotheses into a strongly consistent classifier. In contrast, strong PAC learning ensures $(\varepsilon,\delta)$ guarantees for every positive pair. Both notions rely on the same vocabulary—generalization error, sample complexity, and hypothesis class capacity—and highlight the central PAC message: learnability hinges on balancing expressive power with the ability to control error uniformly over the data-generating process.
