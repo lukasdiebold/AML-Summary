@@ -30,10 +30,11 @@ the property of their respective owners.
 ## Contributing
 
 Feedback and corrections are welcome. If you spot mistakes, unclear passages, or
-missing intuition, please open an issue or reach out with suggestions.
+missing intuition, please open an issue or reach out with suggestions. If you want to contribute, create an issue so everyone knows what you're working on. Pick a TODO from below or just pick you favorite chapter and improve it.
 
 ## TODO
 
-- Verify technical correctness of all chapters.
-- Fill in missing explanations, proofs, and examples.
-- Add citations and sources for figures where applicable.
+- [ ] Write chapter 10 Neural Networks.
+- [ ] Write chapter 11 Transformers.
+- [ ] Write chapter 12 Graph Neural Networks.
+- [ ] Write chapter 14 Reinforcement Learning.
