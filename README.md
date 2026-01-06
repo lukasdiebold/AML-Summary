@@ -27,6 +27,13 @@ The notes are provided without guarantees regarding correctness or completeness.
 Some images are adapted from or taken directly from lecture slides and remain
 the property of their respective owners.
 
+## License
+
+This work is licensed under the Creative Commons Attribution-NonCommercial
+4.0 International License (CC BY-NC 4.0). Third-party images and materials are
+excluded from this license and remain the property of their respective owners.
+See `LICENSE` for details.
+
 ## Contributing
 
 Feedback and corrections are welcome. If you spot mistakes, unclear passages, or
