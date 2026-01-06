@@ -40,6 +40,28 @@ Let $\hat f(x)$ be a single hypothesis trained on data $D$. Ensembles form $\hat
 \end{itemize}
 These mechanisms are complementary: bagging primarily attacks variance, boosting primarily attacks bias, and stacking blends heterogeneous models to capture complementary inductive biases.
 
+\subsection{Bagging and random forests}
+Bagging (bootstrap aggregating) trains each base learner on a bootstrap sample of the training set. For classification, the ensemble prediction is a majority vote; for regression, it is an average:
+\[
+\hat c_B(x) = \operatorname{sgn}\!\left(\sum_{b=1}^B c_b(x)\right), \qquad
+\hat f_B(x) = \frac{1}{B}\sum_{b=1}^B f_b(x).
+\]
+Bootstrap samples overlap but are not identical, so high-variance learners (e.g., trees) move in different directions and averaging stabilizes them.
+
+\begin{algorithmic}
+\State \textbf{Bagging classifier}
+\State Input: data $\{(x_i, y_i)\}_{i=1}^n$, number of models $B$
+\For{$b = 1$ to $B$}
+    \State draw bootstrap sample $Z_b$ from the data (sampling with replacement)
+    \State fit classifier $c_b$ on $Z_b$
+\EndFor
+\State output $\hat c_B(x) = \operatorname{sgn}(\sum_{b=1}^B c_b(x))$
+\end{algorithmic}
+
+Random forests add a second source of randomness by selecting a random subset of features at each split. This further reduces correlation between trees without increasing bias too much. Each tree is a standard decision tree trained on its own bootstrap sample; at prediction time the forest aggregates all trees. Typical split criteria include Gini impurity, entropy, and misclassification rate.
+
+\textbf{Weak learners used in ensembles.} In practice, weak learners can be decision stumps, full decision trees, perceptrons/MLPs, or radial basis function networks. Bagging benefits most from unstable learners whose predictions change noticeably under small perturbations of the data.
+
 \subsection{Boosting}
 For now we're only interested in classification.
 
@@ -58,10 +80,10 @@ To address these issues, we make the following changes:
     \item We replace the 0--1 loss with a surrogate loss function $\ell: \mathbb R \to \mathbb R_+$ that is differentiable and convex, such as the exponential loss $\ell(z) = e^{-yG(x)}$.
     \item We restrict our hypothesis space to a set of weak learners $\mathcal H^A$ ($A$ for additive), with
     \[
-        \mathcal H^A = \left\{G_m | G_m(x) = \sum_{i\leq m} \beta_i f_i(x), f_i \in \mathcal H, \beta_i \in \mathbb R\right\}
+        \mathcal H^A = \left\{G_m \mid G_m(x) = \sum_{i\leq m} \beta_i f_i(x), f_i \in \mathcal H, \beta_i \in \mathbb R\right\}
     \]
 \end{itemize}
-This won't work with linear models. But with weak learners (e.g., decision stumps), we can use boosting to iteratively build a strong classifier by adding weak learners that minimize the surrogate loss on the training data.
+This won't work with linear models. But with weak learners (e.g., decision stumps), we can use boosting to iteratively build a strong classifier by adding weak learners that minimize the surrogate loss on the training data. The additive form also makes it natural to update the model stage by stage.
 
 So then our objective becomes:
 \[
@@ -70,7 +92,7 @@ So then our objective becomes:
 with 
 \[
     \mathcal L(y_i; G(x)) = \exp(-y_i G(x_i))
-    = \exp(-y_i G_{m-1}(x_i))\exp(-y\beta_mf_m(x_i))
+    = \exp(-y_i G_{m-1}(x_i))\exp(-y_i\beta_m f_m(x_i))
     = w_i^{m-1} \mathcal L(y_i; \beta_m f_m(x_i))
 \]
 because $G_m(x)=G_{m-1}(x)+\beta_m f_m(x)$. What did we do? We decomposed the loss at step $m$ into the loss at step $m-1$ and the contribution of the new weak learner $f_m$ with weight $\beta_m$. So now we have two things to optimize: the weak learner $f_m$ and its weight $\beta_m$. 
@@ -81,36 +103,92 @@ and we can rewrite the objective as:
 \]
 
 \subsection{Forward Stagewise Additive Modeling (FSAM)} 
-is a greedy approach to solve this optimization problem. At each step $m$, we fix the previous model $G_{m-1}$ and optimize for the new weak learner $f_m$ and its weight $\beta_m$:
+FSAM provides the bridge from the additive objective to an actual algorithm. Instead of solving for all $f_m$ and $\beta_m$ at once, it builds the model stage by stage: each step adds the single component that most improves the current objective. This is both computationally simple and conceptually aligned with boosting's idea of sequential correction. At each step $m$, we fix the previous model $G_{m-1}$ and optimize for the new weak learner $f_m$ and its weight $\beta_m$:
 
 \begin{algorithmic}
-\State $G_0(x) \gets 0 $, $w_i^0 \gets 1/n$ for all $i$
-\If{$t = 1$ to $m$} 
-    \State $\min_{f_m \in \mathcal H, \beta_m \in \mathbb R} \frac{1}{n} \sum_{i\leq n} w_i^{t-1} \mathcal L(y_i; \beta_t f_t(x_i))$
-    \State $w_i^t \gets w_i^{m-1} \exp(-y_i G_{t-i}(x_i))$
-\EndIf 
+\State $G_0(x) \gets 0$, $w_i^0 \gets 1/n$ for all $i$
+\For{$m = 1$ to $M$}
+    \State $\min_{f_m \in \mathcal H, \beta_m \in \mathbb R} \sum_{i\leq n} w_i^{m-1} \mathcal L(y_i; \beta_m f_m(x_i))$
+    \State $G_m(x) \gets G_{m-1}(x) + \beta_m f_m(x)$
+    \State $w_i^m \propto w_i^{m-1} \exp(-y_i\beta_m f_m(x_i))$
+\EndFor
 \end{algorithmic}
-Future classifieres try to correct the mistakes of past classifiers by focusing more on misclassified examples (increasing their weights). This way, the ensemble learns from its errors and improves over time.
+Future classifiers try to correct the mistakes of past classifiers by focusing more on misclassified examples (increasing their weights). This way, the ensemble learns from its errors and improves over time.
+Gradient boosting generalizes this stagewise procedure by choosing updates from the negative gradient of an arbitrary differentiable loss.
 
 \subsection{Gradient Descent Boosting}
-Wantde $G_{\theta}(x)$ where $\theta \in \Theta$ are parameters. We can use gradient descent to minimize the empirical loss:
+FSAM still depends on a particular loss and reweighting scheme. Gradient boosting generalizes the same stagewise idea to any differentiable loss by viewing boosting as gradient descent in function space. The key move is to replace the weighted classification objective with a gradient step on the loss with respect to the current model's predictions. Wanted $G_{\theta}(x)$ where $\theta \in \Theta$ are parameters. We can use gradient descent to minimize the empirical loss:
 
-    \begin{algorithmic}
-    \State $\theta_0 = \$$
-\For $t=1$ to $T$
+\begin{algorithmic}
+\State $\theta_0$ given
+\For{$t=1$ to $T$}
     \State $\theta_t \leftarrow \theta_{t-1}-\alpha_t \nabla_\theta \mathcal{L}\left(D ; \theta_{t-1}\right)$
 \EndFor
 \end{algorithmic}
-At then end
+At the end
 \[
-\theta_T = \sum_{t\leq T} \alpha _t \nabla_\theta \mathcal L(D; \theta_{t-1})
+\theta_T = \theta_0 - \sum_{t\leq T} \alpha _t \nabla_\theta \mathcal L(D; \theta_{t-1}).
 \]
-The combined algorithm looks like this:
+The combined algorithm looks like this when we perform gradient descent in function space and fit weak learners to the negative gradients (pseudo-residuals). This reveals why boosting works for a wide range of losses and why the base learner only needs to approximate the negative gradient at each step:
 \begin{algorithmic}
-\State $G_0(x) \gets 0$
+\State $G_0(x) \gets \arg\min_\gamma \sum_i \mathcal L(y_i; \gamma)$
 \For{$t = 1$ to $m$}
     \State $r_i^{t-1} \gets -\left[\frac{\partial \mathcal L(y_i; G(x_i))}{\partial G(x_i)}\right]_{G(x)=G_{t-1}(x)}$ for all $i$
     \State $\min_{f_t \in \mathcal H, \beta_t \in \mathbb R} \sum_{i\leq n} (r_i^{t-1} - \beta_t f_t(x_i))^2$
     \State $G_t(x) \gets G_{t-1}(x) + \beta_t f_t(x)$
 \EndFor
 \end{algorithmic}
+This recovers gradient boosting: each stage fits a weak learner to the pseudo-residuals and updates the additive model. Small step sizes and shallow trees typically improve generalization.
+With exponential loss and binary weak learners, this reduces to AdaBoost.
+
+\subsection{AdaBoost}
+AdaBoost is the classic instantiation of the above ideas: it chooses the exponential loss, uses binary weak learners, and yields simple closed-form updates. The reweighting scheme is not arbitrary; it is exactly what makes each new classifier focus on mistakes while keeping the additive model interpretable. AdaBoost is a concrete instance of gradient boosting (and FSAM) with exponential loss and binary labels. Let $y_i \in \{-1,+1\}$ and $c_m(x) \in \{-1,+1\}$. At step $m$, the weighted error is
+\[
+\varepsilon_m = \frac{\sum_{i=1}^n w_i\,\mathbb{I}\{c_m(x_i) \neq y_i\}}{\sum_{i=1}^n w_i}.
+\]
+The update weight is
+\[
+\alpha_m = \tfrac{1}{2}\log\!\left(\frac{1-\varepsilon_m}{\varepsilon_m}\right),
+\]
+and the data weights are updated by
+\[
+ w_i \leftarrow w_i \exp\!\bigl(-\alpha_m y_i c_m(x_i)\bigr), \qquad \sum_i w_i = 1.
+\]
+The final classifier is the sign of the weighted vote, $\hat c(x)=\operatorname{sgn}(\sum_m \alpha_m c_m(x))$.
+
+\begin{derivation}
+The choice of $\alpha_m$ follows from minimizing the weighted exponential loss for a fixed classifier $c_m$:
+\[
+\sum_i w_i \exp\!\bigl(-\alpha y_i c_m(x_i)\bigr)
+= (1-\varepsilon_m)e^{-\alpha} + \varepsilon_m e^{\alpha}.
+\]
+Differentiating and setting to zero yields $-\,(1-\varepsilon_m)e^{-\alpha} + \varepsilon_m e^{\alpha}=0$, hence
+\[
+\alpha_m = \tfrac{1}{2}\log\!\left(\frac{1-\varepsilon_m}{\varepsilon_m}\right).
+\]
+\end{derivation}
+The algorithm only requires each weak learner to perform slightly better than chance ($\varepsilon_m < 1/2$). If a learner is worse than chance, flipping its predictions reduces the error.
+
+\subsection{Boosting as additive modeling}
+Beyond the algorithm, it is useful to understand what boosting is optimizing in the population. This perspective ties the stagewise updates to statistical decision theory and explains why boosting often improves margins. AdaBoost can be viewed as fitting an additive model by minimizing the exponential loss
+\[
+J(F) = \mathbb{E}\bigl[\exp(-yF(x))\bigr].
+\]
+The minimizer of this loss is proportional to the log-odds of the class probabilities, so $F(x)$ estimates a scaled log posterior ratio.
+\begin{derivation}
+Condition on $x$ and write $p = \mathbb{P}(y=1 \mid x)$. Then
+\[
+\mathbb{E}\!\left[e^{-yF(x)} \mid x\right] = p\,e^{-F(x)} + (1-p)\,e^{F(x)}.
+\]
+Differentiating with respect to $F(x)$ and setting to zero gives
+\[
+-p\,e^{-F(x)} + (1-p)\,e^{F(x)} = 0
+\quad\Rightarrow\quad
+F(x) = \tfrac{1}{2}\log\!\left(\frac{p}{1-p}\right).
+\]
+Thus the optimal $F(x)$ is a log-odds function, linking AdaBoost to additive logistic regression.
+\end{derivation}
+This perspective explains why boosting often improves margins and why it can be interpreted as stagewise functional optimization.
+
+\subsection{Stacking}
+Stacking combines heterogeneous models by training a meta-learner on their predictions. To avoid information leakage, base-model predictions for the meta-learner are typically generated via cross-validation. This lets the meta-learner discover which models are reliable in different regions of the input space, often outperforming any single model or uniform averaging.
