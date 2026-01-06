@@ -26,7 +26,7 @@ whenever it receives at least $n \geq p(1/\varepsilon, 1/\delta, \text{size}(c))
 \subsection{Axis-Aligned Rectangles as a Running Example}
 To build intuition, consider $\mathcal{X} = \mathbb{R}^2$ and let $\mathcal{C}$ be all axis-aligned rectangles. Given positive and negative labeled points, a natural learner outputs $\hat{R}$, the smallest rectangle containing every positive sample. 
 
-\begin{figure}[h]
+\begin{figure}[ht]
     \centering
     \includegraphics[width=0.5\textwidth]{images/PAC_1.png}
     \caption{Axis-aligned rectangle learning: the smallest rectangle $\hat{R}$ containing all positive samples.}
@@ -39,7 +39,7 @@ Partition the true rectangle $R$ into four thin \emph{strips}: upper, lower, lef
 
 The key insight is that if the learned rectangle $\hat{R}$ misses any strip, it will incur large error. We formalize this by analyzing the probability that $\hat{R}$ intersects all four strips.
 
-\begin{figure}[h]
+\begin{figure}[ht]
     \centering
     \includegraphics[width=0.5\textwidth]{images/PAC_2.png}
     \caption{Partitioning the true rectangle into four strips, each with probability mass $\varepsilon/4$.}
@@ -63,7 +63,7 @@ It suffices to set $n \geq \tfrac{4}{\varepsilon} \log \tfrac{4}{\delta}$ to mak
 \subsection{Induction Principles and Empirical Risk Minimization}
 Learning can be viewed as an induction principle: from observed labeled samples we induce a rule that will be used to classify new points. Once a hypothesis has been induced, deduction applies the rule to unseen inputs, while \emph{transduction} skips explicit model building and predicts labels for a specific test set directly. PAC learning focuses on induction and the conditions under which it is justified.
 
-\begin{figure}[h]
+\begin{figure}[ht]
     \centering
     \includegraphics[width=0.5\textwidth]{images/slt_1.png}
     \caption{Relation between induction, deduction, and transduction.}
