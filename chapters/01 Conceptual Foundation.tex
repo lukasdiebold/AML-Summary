@@ -55,31 +55,22 @@ In epistemology, we differentiate between \textbf{deduction} and \textbf{inducti
     $$
     \theta^{\star}\left(X^{\prime}\right) \sim \mathbb{P}^{\mathcal{A}}(\theta \mid X) \in \arg \min _{\mathbb{P}(. \mid .)} \mathbb{E}_{X^{\prime}} \mathbb{E}_{\theta \mid X^{\prime}} \mathbb{E}_{X^{\prime \prime} \mid X^{\prime}} R\left(\theta, X^{\prime \prime}\right)
     $$
-    where $X'$ is the training data and $X''$ is the test data, so thiw is the risk where $\theta$ is conditioned on the training data (trained the model).
+    where $X'$ is the training data and $X''$ is the test data, so this is the risk where $\theta$ is conditioned on the training data (trained the model). This is the standard model.
+
     \item Log loss of posterior (risks and probabilities are dependent!)
-    
     $$
     \begin{aligned}
     \theta^{\star}\left(X^{\prime}\right) \sim \mathbb{P}^{\mathcal{A}}(\theta \mid X) & \in \arg \min _{\mathbb{P}(. \mid .)} \mathbb{E}_{X^{\prime}} \mathbb{E}_{\theta \mid X^{\prime}} \mathbb{E}_{X^{\prime \prime} \mid X^{\prime}}\left(-\log \mathbb{P}\left(\theta \mid X^{\prime \prime}\right)\right) \\
     & \in \arg \min _{\mathbb{P}(. \mid .)} \mathbb{E}_{X^{\prime}} \mathbb{E}_{\theta \mid X^{\prime}} \mathbb{E}_{X^{\prime \prime} \mid X^{\prime}}\left(\beta R\left(\theta, X^{\prime \prime}\right)+\log Z\right)
     \end{aligned}
     $$
+    This objective scores the full posterior: on average it should concentrate on parameters that make future data likely. Using the Gibbs form $\mathbb{P}(\theta \mid X^{\prime \prime}) \propto \exp(-\beta R(\theta, X^{\prime \prime}))$, the log loss becomes $\beta R(\theta, X^{\prime \prime}) + \log Z$, so minimizing expected log loss matches minimizing expected risk up to the normalizer. Unlike the first criterion, which evaluates the risk of a single parameter draw, this one emphasizes posterior calibration via how probability mass is distributed.
     \item Posterior agreement
     $$
     \theta^{\star}\left(X^{\prime}\right) \sim \mathbb{P}^{\mathcal{A}}(\theta \mid X) \in \arg \min _{\mathbb{P}(. \mid .)} \mathbb{E}_{X^{\prime}} \mathbb{E}_{X^{\prime \prime} \mid X^{\prime}}\left(-\log \mathbb{E}_{\theta \mid X^{\prime}} \mathbb{P}\left(\theta \mid X^{\prime \prime}\right)\right)
     $$
+    This criterion maximizes the average overlap between the posterior from training data $X'$ and the posterior induced by future data $X''$: $\mathbb{E}_{\theta \mid X'} \mathbb{P}(\theta \mid X'')$ is a similarity score, and the outer $-\log$ turns it into a loss. Unlike the second objective, which takes the expectation of a log loss for a sampled $\theta$, here the log is outside the expectation over $\theta$, so it rewards overall posterior agreement rather than pointwise posterior accuracy.
 \end{itemize}
 
 \subsection{Conceptional Foundation of Inference}
-\begin{itemize}
-    \item Our perception of “our world” / reality is mediated by data of senses / sensors.
-    \item Our data are influenced by chance.
-    \item Creatures interpret selected aspects of reality by hypotheses to "survive and reproduce"
-    \item Data and hypotheses define models to enable judgements, decisions and actions.
-    \item AI / ML: Algorithms define relations of data and hypotheses, e.g., they select models !
-\end{itemize}
-
-
-
-
-
+Our perception of reality is mediated by data from our senses or sensors, and those data are shaped by chance. Creatures interpret selected aspects of reality through hypotheses in order to survive and reproduce, and data together with hypotheses define models that enable judgments, decisions, and actions. In AI/ML, algorithms formalize the relation between data and hypotheses, for example by selecting models.

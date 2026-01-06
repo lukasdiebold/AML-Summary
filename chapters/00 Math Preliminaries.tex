@@ -1,5 +1,5 @@
 \section{Math Preliminaries}
-\textbf{Gibbs Distribution}
+\subsection{Gibbs Distribution}
 The Gibbs distribution is a probability distribution that assigns likelihoods to states based on a cost function, with lower-cost states being more probable. Given a set of states $x \in \mathcal{X}$, a cost function $E(x)$, and an inverse temperature parameter $\beta > 0$, the Gibbs distribution is
 $$
 p(x)=\frac{1}{Z}e^{-\beta E(x)}
@@ -46,7 +46,6 @@ Equivalently, these follow from the block inversion identity and the Schur compl
 
 \subsection{Schur complement}
 \label{sec:schur-complement}
-\begin{notebox}
 For a block matrix $M = \begin{bmatrix} A & B \\ C & D \end{bmatrix}$ with $D$ invertible, the \textbf{Schur complement of $D$ in $M$} is
 \[
 S = A - B D^{-1} C.
@@ -61,4 +60,3 @@ Key identities (when the required inverses exist):
 	\item If $M$ is symmetric positive (semi)definite and $D$ is invertible, then $S$ is also positive (semi)definite.
 \end{itemize}
 Symmetrically, if $A$ is invertible, the Schur complement of $A$ is $D - C A^{-1} B$. In Gaussian conditioning, $\operatorname{Cov}(a\mid b)$ equals the Schur complement of $\Sigma_{bb}$ in the joint covariance.
-\end{notebox}
