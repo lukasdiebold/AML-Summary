@@ -20,12 +20,12 @@ Observations are linear combinations of Gaussian variables, so the vector of out
 Since $\beta \sim \mathcal{N}(0, \Lambda^{-1})$ and $\varepsilon \sim \mathcal{N}(0, \sigma^2 I_n)$ are independent,
 \begin{align*}
 \mathbb{E}[y] &= \mathbb{E}[X\beta + \varepsilon] = X\,\mathbb{E}[\beta] + \mathbb{E}[\varepsilon] = 0, \\
-\operatorname{Cov}(y) &= \mathbb{E}\big[(y - \mathbb{E}y)(y - \mathbb{E}y)^\top\big] 
-= \mathbb{E}\big[(X\beta + \varepsilon)(X\beta + \varepsilon)^\top\big] \\
+\operatorname{Cov}(y) &= \mathbb{E}\big[(y - \mathbb{E}[y])(y - \mathbb{E}[y])^\top\big] \\
+& = \mathbb{E}\big[(X\beta + \varepsilon)(X\beta + \varepsilon)^\top\big] \\
 &= X\,\mathbb{E}[\beta\beta^\top] X^\top + \mathbb{E}[\varepsilon\varepsilon^\top] + X\,\mathbb{E}[\beta\varepsilon^\top] + \mathbb{E}[\varepsilon\beta^\top] X^\top \\
 &= X\,\Lambda^{-1} X^\top + \sigma^2 I_n,
 \end{align*}
-where the cross terms vanish by independence (and zero means).
+where we used $\mathbb{E}[\beta\beta^{\top}]=\operatorname{Cov}(\beta)=\Lambda^{-1}$ for a zero-mean Gaussian. The cross terms vanish because $\mathbb{E}[\beta\varepsilon^\top]=\mathbb{E}[\beta]\mathbb{E}[\varepsilon]^\top=0$ and $\mathbb{E}[\varepsilon\beta^\top]=\mathbf{0}$ by independence and zero means.
 \end{derivation}
 Defining $k(x_i, x_j) = x_i^\top \Lambda^{-1} x_j$ turns this covariance into a kernel (Gram) matrix $K$, so $y \sim \mathcal{N}(0, K + \sigma^2 I)$. Replacing the dot-product kernel by any valid positive semi-definite kernel function “kernelizes” Bayesian ridge regression; the resulting stochastic process over functions is a Gaussian process.
 

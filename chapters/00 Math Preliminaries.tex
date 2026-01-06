@@ -60,3 +60,46 @@ Key identities (when the required inverses exist):
 	\item If $M$ is symmetric positive (semi)definite and $D$ is invertible, then $S$ is also positive (semi)definite.
 \end{itemize}
 Symmetrically, if $A$ is invertible, the Schur complement of $A$ is $D - C A^{-1} B$. In Gaussian conditioning, $\operatorname{Cov}(a\mid b)$ equals the Schur complement of $\Sigma_{bb}$ in the joint covariance.
+
+\subsection{Vector and matrix calculus}
+\label{sec:matrix-calculus}
+We use the convention that gradients are column vectors. For $x \in \mathbb{R}^d$ and matrices/vectors of compatible dimensions, the following identities are used repeatedly:
+\begin{itemize}
+    \item $\nabla_x (b^{\top} x) = b$ and $\nabla_x (x^{\top} b) = b$.
+    \item $\nabla_x (x^{\top} A x) = (A + A^\top)x$ (and $= 2Ax$ if $A$ is symmetric).
+    \item $\nabla_x \|x\|^2_2 = \nabla_x (x^{\top} x) = 2x$.
+    \item $\nabla_\beta \|y - X\beta\|^2_2 = -2 X^{\top}(y - X\beta)$.
+\end{itemize}
+
+\begin{derivation}
+	For $f(x)=b^{\top}x=\sum_i b_i x_i$, we have $\partial f/\partial x_i=b_i$, so $\nabla_x f=b$. The same holds for $x^{\top}b$ since it is the same scalar.
+\end{derivation}
+
+\begin{derivation}
+To see why $\nabla_x (x^{\top} A x) = (A + A^{\top})x$, expand component-wise:
+\[
+f(x) = x^{\top} A x = \sum_{i,j} x_i A_{ij} x_j.
+\]
+Then the $k$-th component of the gradient is
+\[
+\frac{\partial f}{\partial x_k}
+= \sum_j A_{kj} x_j + \sum_i x_i A_{ik}
+= (Ax)_k + (A^{\top}x)_k.
+\]
+Stacking these components yields $\nabla_x f = (A + A^{\top})x$.
+\end{derivation}
+
+\begin{derivation}
+	For $f(x)=\|x\|^2_2=x^{\top}x$, apply the rule $\nabla_x (x^{\top} A x) = (A + A^\top)x$ with $A = I$. Since $I$ is symmetric, $\nabla_x f = 2Ix = 2x$.
+\end{derivation}
+
+\begin{derivation}
+For $g(\beta)=\|y-X\beta\|^2=(y-X\beta)^{\top}(y-X\beta)$, expand to $y^{\top}y-2y^{\top}X\beta+\beta^{\top}X^{\top}X\beta$ and apply the previous rules:
+\[
+\nabla_\beta g = -2X^{\top}y + 2X^{\top}X\beta.
+\]
+Here we use that $y^{\top}X\beta = (X^{\top}y)^{\top}\beta$, so $\nabla_\beta(-2y^{\top}X\beta)=-2X^{\top}y$. 
+
+Rewriting yields $\nabla_\beta g=-2X^{\top}(y-X\beta)$.
+\end{derivation}
+

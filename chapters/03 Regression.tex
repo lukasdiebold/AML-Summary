@@ -108,6 +108,21 @@ Compare this to OLS: the regularization term $\lambda I$ is added to $X^\top X$ 
     \label{eq:var-ridge}
     \text{Var}(\hat \beta_{\text {MAP }}) = \sigma^2 \sum_{i\leq r} \frac{D_{ii}^2}{\left(D_{ii}^2+\lambda\right)^2} V_i V_i^{\top}
 \end{equation}
+\begin{derivation}
+Using $\hat{\beta}_{\text{MAP}}=(X^{\top}X+\lambda I)^{-1}X^{\top}y$ and $y=X\beta_*+\varepsilon$ with $\varepsilon \sim \mathcal{N}(0,\sigma^2 I)$, the estimator is affine in $y$, so its variance depends only on the noise:
+\[
+\operatorname{Var}(\hat{\beta}_{\text{MAP}})
+= (X^{\top}X+\lambda I)^{-1}X^{\top}\operatorname{Var}(y)\,X(X^{\top}X+\lambda I)^{-1}
+ = \sigma^2 (X^{\top}X+\lambda I)^{-1}X^{\top}X(X^{\top}X+\lambda I)^{-1}.
+\]
+With the SVD $X=UDV^{\top}$, we have $X^{\top}X=V D^{2} V^{\top}$ and $(X^{\top}X+\lambda I)^{-1}=V(D^{2}+\lambda I)^{-1}V^{\top}$. Substituting,
+\[
+\operatorname{Var}(\hat{\beta}_{\text{MAP}})
+= \sigma^2 V(D^{2}+\lambda I)^{-1}D^{2}(D^{2}+\lambda I)^{-1}V^{\top}
+= \sigma^2 \sum_{i\le r}\frac{D_{ii}^2}{(D_{ii}^2+\lambda)^2} V_i V_i^{\top},
+\]
+which yields \eqref{eq:var-ridge}.
+\end{derivation}
 The key is the \textbf{shrinkage factor} $\frac{D_{ii}^2}{(D_{ii}^2+\sigma^2/\tau^2)^2}$. For large singular values ($D_{ii}^2 \gg \sigma^2/\tau^2$), this is close to $1/D_{ii}^2$ (like OLS). For small singular values ($D_{ii}^2 \ll \sigma^2/\tau^2$), the factor is approximately $\tau^4 D_{ii}^2/\sigma^4$, which decays much more slowly than $1/D_{ii}^2$. This prevents variance blow-up in the problematic low-variance directions, stabilizing the estimator at the cost of introducing bias (shrinking coefficients toward zero). 
 
 \subsection{Act 3: Polynomial regression via kernels}
