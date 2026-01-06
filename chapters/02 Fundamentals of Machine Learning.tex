@@ -1,15 +1,17 @@
 \section{Fundamentals of Machine Learning}
 
-Machine learning is fundamentally about inferring models from data. At its core lies Bayes' rule, which relates the posterior distribution (model given data) to the likelihood and prior:
+Machine learning is about inferring models from data. We begin with Bayes' rule to show how likelihood and prior combine to form the posterior, which is the full probabilistic description of what we know after seeing data:
 $$
 \mathbb{P}( \text{model} \mid \text{data}) =\frac{\mathbb{P}(\text { data } \mid \text { model }) \mathbb{P}(\text { model })}{\mathbb{P}(\text { data })}
 $$
 
-In the \textbf{maximum likelihood (ML)} approach, we select the model that maximizes the likelihood of observing the data:
+In many practical settings, we compress the posterior into a single point estimate. A common choice is the \textbf{maximum likelihood (ML)} approach, which selects the model that maximizes the likelihood of observing the data:
 $$
 \widehat{\text { model }} \in \arg \max _{\text {model }} \mathbb{P} (\text{data} \mid \text{model})
 $$
-Under regularity conditions, the ML estimator $\widehat{\text{model}_n}$ is consistent, asymptotically normal, and asymptotically efficient.
+Under regularity conditions, the ML estimator $\widehat{\text{model}_n}$ is consistent, asymptotically normal, and asymptotically efficient. This highlights why ML remains a standard baseline: it ignores the prior but becomes reliable as data grow.
+
+To understand what makes an estimator "good," we introduce two core properties that we will use throughout.
 
 \textbf{Consistency:} A point estimator $\hat{\theta}_{n}$ of the parameter $\theta=\theta_{0}$ is consistent if it converges in probability to the true parameter:
 $$
@@ -24,24 +26,34 @@ $$
 $$
 \hat{\theta}_{n}=\arg \min_{\hat{\theta}} \mathbb{E}\left[\left(\hat{\theta}_{n}-\theta_{0}\right)^{2}\right]
 $$
-The question then arises: how precisely can we estimate $\theta$ given $n$ samples? The Cramér-Rao bound provides a fundamental lower bound on the variance of any unbiased estimator.
+Consistency is a long-run guarantee, while efficiency quantifies finite-sample precision.
+
+This raises the practical question of precision: how well can we estimate $\theta$ from $n$ samples? The Cramér-Rao bound provides a fundamental lower bound on the variance of any unbiased estimator.
 
 \subsection{Efficiency: Cramér-Rao Bound}
 
-\textbf{Problem:} What is the best achievable precision for parameter estimation?
+\textbf{Problem:} What is the best achievable precision for parameter estimation, given a likelihood model? We want a benchmark that applies to any estimator so we can judge how close a procedure gets to optimal performance.
 
 Given a likelihood $p(y \mid \theta)$ for $\theta \in \Theta$ and data $y_{1}, \ldots, y_{n} \sim p\left(y \mid \theta=\theta_{0}\right)$, we ask: How precisely can we estimate $\theta=\theta_{0}$ given $n$ samples?
 
 For an estimator $\hat{\theta}\left(y_{1}, \ldots, y_{n}\right)$, we measure precision via the mean squared error:
 $$\mathbb{E}_{y \mid \theta}\left[(\hat{\theta}-\theta)^{2}\right]$$
+The Cramér-Rao bound (Equation \ref{eq:cramer-rao}) shows that this error cannot be made arbitrarily small; it is constrained by the information in the data and by estimator bias.
 
-\textbf{Key definitions:}
+\begin{equation}
+    \mathbb{E}_{y \mid \theta}\left[(\hat{\theta}-\theta)^{2}\right] \geq \frac{\left(\frac{\partial}{\partial \theta} b_{\hat{\theta}}+1\right)^{2}}{\mathbb{E}_{y \mid \theta}\left[\Lambda^{2}\right]}+b_{\hat{\theta}}^{2}
+    \label{eq:cramer-rao}
+\end{equation}
+Estimation error is fundamentally limited by the curvature of the likelihood (via the score variance) and the estimator bias. Even the best estimator cannot beat this limit for a given model.
+\begin{derivation}
+The derivation relies on the score and the estimator bias. The score measures local sensitivity of the log-likelihood to $\theta$, while the bias captures systematic estimation error.
 \begin{itemize}
     \item Score: $\Lambda=\frac{\partial}{\partial \theta} \log p(y \mid \theta)=\frac{\frac{\partial}{\partial \theta} p(y \mid \theta)}{p(y \mid \theta)}$
     \item Bias: $b_{\hat{\theta}}=\mathbb{E}_{y \mid \theta}\left[\hat{\theta}\left(y_{1}, \ldots, y_{n}\right)\right]-\theta$
 \end{itemize}
+We will relate the score to the estimator, express their covariance in terms of bias, and then use Cauchy-Schwarz to obtain a limit on the mean squared error.
 
-\textbf{Expected score:} The score has zero mean.
+\textbf{Expected score:} The score has zero mean. This follows from the normalization of $p(y \mid \theta)$ and ensures the score behaves like a centered random variable.
 $$
 \begin{aligned}
 \mathbb{E}_{y \mid \theta}[\Lambda] & =\int p(y \mid \theta) \frac{\frac{\partial}{\partial \theta} p(y \mid \theta)}{p(y \mid \theta)} d y \\
@@ -57,12 +69,13 @@ $$
 & =\frac{\partial}{\partial \theta}\left(\mathbb{E}_{y \mid \theta} \hat{\theta}\right)=\frac{\partial}{\partial \theta}\left(b_{\hat{\theta}}+\theta\right)=\frac{\partial}{\partial \theta} b_{\hat{\theta}}+1
 \end{aligned}
 $$
+This identity ties the score to the bias derivative and will connect estimation error to likelihood curvature.
 
 \textbf{Cross-correlation:}
 $$
 \mathbb{E}_{y \mid \theta}\left[\left(\Lambda-\mathbb{E} \Lambda\right)\left(\hat{\theta}-\mathbb{E} \hat{\theta}\right)\right]=\mathbb{E}_{y \mid \theta}[\Lambda \hat{\theta}]-\mathbb{E}_{y \mid \theta}[\Lambda] \mathbb{E} \hat{\theta}=\mathbb{E}_{y \mid \theta}[\Lambda \hat{\theta}]
 $$
-since $\mathbb{E}[\Lambda]=0$.
+since $\mathbb{E}[\Lambda]=0$. This expresses the covariance between the score and the estimator in terms of the score-estimator product.
 
 \textbf{Cauchy-Schwarz inequality:} Applying Cauchy-Schwarz to the cross-correlation:
 $$
@@ -77,7 +90,7 @@ $$
 &=\mathbb{E}_{y \mid \theta}\left[(\hat{\theta}-\theta)^{2}\right]-b_{\hat{\theta}}^{2}
 \end{aligned}
 $$
-Therefore:
+Therefore, bounding the covariance by the product of variances yields a lower bound on the mean squared error once we substitute the bias term:
 $$
 \left(\frac{\partial}{\partial \theta} b_{\hat{\theta}}+1\right)^{2} \leq \mathbb{E}_{y \mid \theta}\left[\Lambda^{2}\right]\left(\mathbb{E}_{y \mid \theta}\left[(\hat{\theta}-\theta)^{2}\right]-b_{\hat{\theta}}^{2}\right)
 $$
@@ -85,12 +98,13 @@ Rearranging yields the \textbf{Cramér-Rao bound}:
 $$
 \mathbb{E}_{y \mid \theta}\left[(\hat{\theta}-\theta)^{2}\right] \geq \frac{\left(\frac{\partial}{\partial \theta} b_{\hat{\theta}}+1\right)^{2}}{\mathbb{E}_{y \mid \theta}\left[\Lambda^{2}\right]}+b_{\hat{\theta}}^{2}
 $$
+\end{derivation}
 
 \textbf{Fisher information:} The expected squared score is called the Fisher information:
 $$
 I(\theta) := \mathbb{E}_{y \mid \theta}\left[\Lambda^{2}\right]=\int p(y \mid \theta)\left(\frac{\partial}{\partial \theta} \log p(y \mid \theta)\right)^{2} d y
 $$
-It measures how much information the data contains about the parameter $\theta$. Higher Fisher information means we can estimate $\theta$ more precisely.
+It measures how much information the data contains about the parameter $\theta$. Higher Fisher information means we can estimate $\theta$ more precisely, which emphasizes that precision is controlled by data informativeness, not just by the estimator.
 
 \textbf{Remarks:}
 \begin{itemize}
@@ -98,19 +112,19 @@ It measures how much information the data contains about the parameter $\theta$.
     \item The bound reveals a trade-off for biased estimators: reducing bias derivative $\frac{\partial}{\partial \theta} b_{\hat{\theta}}$ vs. reducing squared bias $b_{\hat{\theta}}^{2}$. Unbiased estimators are not always optimal!
 \end{itemize}
 
-\textbf{Fisher information for $n$ i.i.d. samples:}
+\subsection{Fisher information for $n$ i.i.d. samples:}
+The Fisher information of $n$ i.i.d. random variables is $n$ times the Fisher information of a single random variable. This shows that precision improves linearly with sample size.
+\begin{derivation}
 $$
 \begin{aligned}
 I^{(n)}(\theta) &= \mathbb{E}_{y_{1}, \ldots, y_{n} \mid \theta}\left[\Lambda^{2}\right] \\
 &= \mathbb{E}\left[\left(\frac{\partial}{\partial \theta} \log p\left(y_{1}, \ldots, y_{n} \mid \theta\right)\right)^2\right] \\
-&= \mathbb{E}\left[\left(\sum_{i=1}^n \frac{\partial}{\partial \theta} \log p\left(y_{i} \mid \theta\right)\right)^{2}\right] = \mathbb{E}\left[\left(\sum_{i=1}^n \Lambda_{i}\right)^{2}\right] \\
+&= \mathbb{E}\left[\left(\sum_{i=1}^n \frac{\partial}{\partial \theta} \log p\left(y_{i} \mid \theta\right)\right)^{2}\right] \\
+&= \mathbb{E}\left[\left(\sum_{i=1}^n \Lambda_{i}\right)^{2}\right] \\
 &= \sum_{i=1}^n \mathbb{E}\left[\Lambda_{i}^{2}\right]+\sum_{i \neq j} \mathbb{E}\left[\Lambda_{i}\right] \mathbb{E}\left[\Lambda_{j}\right] \\
-&= \sum_{i=1}^n \mathbb{E}\left[\Lambda_{i}^{2}\right] = n I(\theta)
+&= \sum_{i=1}^n \mathbb{E}\left[\Lambda_{i}^{2}\right]\\
+&= n I(\theta)
 \end{aligned}
 $$
 where the cross-terms vanish because $\mathbb{E}[\Lambda_i]=0$ and the samples are independent.
-
-\textbf{Key insight:} The Fisher information of $n$ i.i.d. random variables is $n$ times the Fisher information of a single random variable. This shows that precision improves linearly with sample size.
-
-
-
+\end{derivation}
