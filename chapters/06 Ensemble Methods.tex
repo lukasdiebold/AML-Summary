@@ -1,5 +1,12 @@
 \section{Ensemble Methods}
 
+Bagging, boosting, and stacking are the three canonical ensemble strategies:
+\begin{itemize}
+    \item \textbf{Bagging} (bootstrap aggregating) trains many models independently on bootstrapped samples and averages or votes their predictions to reduce variance.
+    \item \textbf{Boosting} trains models sequentially, each focusing on the errors of the previous ones, to reduce bias (e.g., AdaBoost, gradient boosting).
+    \item \textbf{Stacking} trains diverse base models and then fits a meta-model on their outputs to learn the best combination.
+\end{itemize}
+
 Ensemble methods combine multiple base learners to obtain a predictor whose bias, variance, or loss surface is superior to any constituent model. By averaging or sequentially correcting learners trained on diverse views of the data, ensembles produce more stable predictions, calibrated uncertainties, and richer inductive biases than single models. This chapter summarizes the bootstrap-based family (bagging and random forests), boosting, and more general stacking strategies, with an emphasis on how they target different points along the bias--variance trade-off.
 
 \subsection{Why ensembles help}
