@@ -1,4 +1,4 @@
-\section{From Convex Optimization to SVM}
+\section{Support Vector Machines}
 
 For support vector machines (SVMs), we're interested in maximising the margin between classes. So given a dataset $D=\{(x_i, y_i)\}$ with $y_i \in \{-1, +1\}$ and guaranteed linear separability, we want to find a hyperplane defined by $(w, w_0)$ such that $w^T x_i + w_0 > 0$ if $y_i = 1$ and $w^T x_i + w_0 < 0$ if $y_i = -1$. Or in other terms, we want to satisfy the constraints $y_i (w^T x_i + w_0) > 0$ for all $i$.
 The margin is defined as the distance from the hyperplane to the closest data point, which can be expressed as $\frac{2}{\|w\|}$.
