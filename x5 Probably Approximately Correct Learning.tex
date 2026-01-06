@@ -60,8 +60,62 @@ Intuitively, intersecting every strip forces $\hat{R}$ to stretch all the way to
 It suffices to set $n \geq \tfrac{4}{\varepsilon} \log \tfrac{4}{\delta}$ to make the failure probability at most $\delta$. The dependence is logarithmic in $1/\delta$ and linear in $1/\varepsilon$, exactly the scaling promised by the PAC definition.
 \end{derivation}
 
+\subsection{Induction Principles and Empirical Risk Minimization}
+Learning can be viewed as an induction principle: from observed labeled samples we induce a rule that will be used to classify new points. Once a hypothesis has been induced, deduction applies the rule to unseen inputs, while \emph{transduction} skips explicit model building and predicts labels for a specific test set directly. PAC learning focuses on induction and the conditions under which it is justified.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{images/slt_1.png}
+    \caption{Relation between induction, deduction, and transduction.}
+    \label{fig:slt_1}
+\end{figure}
+
+The standard induction rule is \emph{empirical risk minimization} (ERM). Given a hypothesis class $\mathcal{C}$, ERM selects
+\[
+    \hat{c}_n^\ast \in \arg\min_{c \in \mathcal{C}} \widehat{R}_n(c),
+\]
+where $\widehat{R}_n(c)$ is the empirical classification error. This choice is computable without any prior assumptions on $D$, but it shifts the burden to analysis: we need distribution-independent bounds on the excess risk
+\[
+    R(\hat{c}_n^\ast) - \inf_{c \in \mathcal{C}} R(c).
+\]
+The rest of the chapter develops tools to control this deviation with high probability.
+
+\subsection{Uniform Convergence and the VC Inequality}
+The empirical minimizer is data-dependent, so the law of large numbers for a \emph{fixed} classifier does not directly apply. For any fixed $c$, the law would guarantee $\widehat{R}_n(c) \to R(c)$ as $n \to \infty$, but ERM selects $\hat{c}_n$ after seeing the data, so the hypothesis itself changes with the sample. The remedy is \emph{uniform convergence}: ensure that \emph{all} hypotheses in $\mathcal{C}$ have empirical risks close to their true risks simultaneously. This solves the issue because it guarantees that whichever $\hat{c}_n$ ERM picks will still have $\widehat{R}_n(\hat{c}_n) \approx R(\hat{c}_n)$.
+
+Let $c^\star = \arg\min_{c \in \mathcal{C}} R(c)$ denote the best-in-class classifier. Then
+\[
+    \begin{aligned}
+    \mathcal{R}\left(\hat{c}_n^{\star}\right)-\inf _{c \in \mathcal{C}} \mathcal{R}(c) & =\mathcal{R}\left(\hat{c}_n^{\star}\right)-\hat{\mathcal{R}}_n\left(\hat{c}_n^{\star}\right)+\hat{\mathcal{R}}_n\left(\hat{c}_n^{\star}\right)-\inf _{c \in \mathcal{C}} \mathcal{R}(c) \\
+    & \leq \underbrace{\mathcal{R}\left(\hat{c}_n^{\star}\right)-\hat{\mathcal{R}}_n\left(\hat{c}_n^{\star}\right)}+\underbrace{\hat{\mathcal{R}}_n\left(c^{\star}\right)-\mathcal{R}\left(c^{\star}\right)} \\
+    & \leq \sup _{c \in \mathcal C}\left|\hat{\mathcal{R}}_n(c)-\mathcal{R}(c)\right|+\sup _{c \in \mathcal{C}}\left|\hat{\mathcal{R}}_n(c)-\mathcal{R}(c)\right|\\
+    & \leq 2 \sup _c\left|\hat{\mathcal{R}}_n(c)-\mathcal{R}(c)\right|
+    \end{aligned}
+\]
+Consequently,
+\[
+    \mathbb{P}\left(R(\hat{c}_n^\ast) - \inf_{c \in \mathcal{C}} R(c) > \varepsilon\right)
+    \leq \mathbb{P}\left(\sup_{c \in \mathcal{C}} \bigl|\widehat{R}_n(c) - R(c)\bigr| > \varepsilon/2\right).
+\]
+Interpretation: the only way ERM can be more than $\varepsilon$ worse than the best-in-class classifier is if \emph{some} hypothesis in the class has its empirical risk misestimate the true risk by more than $\varepsilon/2$. Thus controlling uniform deviation is sufficient to control excess risk.
+This bound explains why empirical minimizers can have smaller \emph{empirical} error than the true minimizer $c^\star$ yet still generalize: what matters is the uniform deviation between empirical and true risks across the class.
+
 \subsection{Finite Hypothesis Classes and Consistency}
-When $\mathcal{H}$ is finite and the algorithm outputs a hypothesis consistent with the sample ($\widehat{R}_n(\hat{c}) = 0$), geometry no longer matters. Every $h \in \mathcal{H}$ with true error $R(h) > \varepsilon$ must mislabel at least an $\varepsilon$-fraction of the instance space. A consistent learner can select such an $h$ only if none of the $n$ examples land inside its error region, an event with probability at most $\exp(-n\varepsilon)$ by independence. Applying a union bound over all $|\mathcal{H}|$ bad hypotheses yields
+For a finite hypothesis class $\mathcal{H}$ with $N = |\mathcal{H}|$, concentration inequalities make uniform convergence explicit. For any fixed $h$, the empirical risk is an average of Bernoulli errors in $[0,1]$, so Hoeffding's inequality gives
+\[
+    \mathbb{P}\left(\bigl|\widehat{R}_n(h) - R(h)\bigr| > \varepsilon\right) \leq 2 \exp(-2n\varepsilon^2).
+\]
+Applying a union bound over $N$ hypotheses yields
+\[
+    \mathbb{P}\left(\sup_{h \in \mathcal{H}} \bigl|\widehat{R}_n(h) - R(h)\bigr| > \varepsilon\right) \leq 2N \exp(-2n\varepsilon^2).
+\]
+Equivalently, with probability at least $1 - \delta$, the following \emph{uniform confidence interval} holds for all $h \in \mathcal{H}$:
+\[
+    R(h) \leq \widehat{R}_n(h) + \sqrt{\frac{\log N + \log(2/\delta)}{2n}}.
+\]
+The variance term decays as $1/\sqrt{n}$ and grows only logarithmically with $N$, which makes large but finite hypothesis classes viable.
+
+In the realizable case, where the algorithm can return a hypothesis consistent with the sample ($\widehat{R}_n(\hat{c}) = 0$), a sharper argument is possible. Every $h \in \mathcal{H}$ with true error $R(h) > \varepsilon$ must mislabel at least an $\varepsilon$-fraction of the instance space, so the probability that none of the $n$ samples expose its error region is at most $\exp(-n\varepsilon)$. A union bound over all $N$ bad hypotheses yields
 \[
     \mathbb{P}\bigl(R(\hat{c}) > \varepsilon\bigr) \leq |\mathcal{H}| \exp(-n\varepsilon).
 \]
@@ -75,7 +129,7 @@ to guarantee $R(\hat{c}) \leq \varepsilon$ with probability at least $1 - \delta
 \subsection{Agnostic PAC Learning and Bayes Risk}
 The realizable assumption breaks when identical feature vectors carry different labels, as in noisy measurement regimes. In this \emph{agnostic} scenario the benchmark is the Bayes optimal classifier $c_{\text{Bayes}}(x) = \arg\max_{y \in \{0,1\}} \mathbb{P}(y \mid x)$ with minimal achievable risk $R^\star$. Unlike the realizable case, no algorithm can guarantee error below $R^\star$ if the true labeling rule lies outside the hypothesis class. Instead we ask the learner to track the best rule available inside $\mathcal{C}$.
 
-A hypothesis class $\mathcal{C}$ is agnostically PAC learnable if there exists $A$ that, for every distribution on $\mathcal{X} \times \{0,1\}$ and every $\varepsilon,\delta$, outputs $\hat{c}$ with
+A hypothesis class $\mathcal{C}$ is agnostically PAC learnable if there exists a learning algorithm $A$ that, for every distribution on $\mathcal{X} \times \{0,1\}$ and every $\varepsilon,\delta$, outputs $\hat{c}$ with
 \[
     \mathbb{P}\left(R(\hat{c}) - \inf_{c \in \mathcal{C}} R(c) \leq \varepsilon\right) \geq 1 - \delta.
 \]
@@ -95,6 +149,26 @@ Finite VC dimension ensures that empirical risk minimization cannot overfit arbi
     \mathbb{P}\left(R(\hat{c}_n^\ast) - \inf_{c \in \mathcal{C}} R(c) > \varepsilon\right) \leq 9 n^{\mathrm{VC}_\mathcal{C}} \exp\left(-\frac{n\varepsilon^2}{32}\right),
 \]
 which tends to zero as $n$ grows. Thus finite VC dimension is both necessary and sufficient for PAC learnability in many settings.
+
+\subsection{Empirical Risk Minimization for Hyperplanes}
+Linear separators provide a concrete example of an infinite hypothesis class that is still learnable. Let $\mathcal{C}$ be the set of all hyperplanes in $\mathbb{R}^d$, which is uncountable. However, on a fixed sample of size $n$, only finitely many distinct labelings are possible. A \emph{fingering} argument makes this explicit: choose any $d$ sample points in general position (which holds with probability one under a density), and the hyperplane passing through them defines two classifiers depending on which side is labeled positive. There are at most $2\binom{n}{d}$ such classifiers, so the effective size of the class on the sample is polynomial in $n$ for fixed $d$.
+
+Moreover, for any linear classifier $c$ there exists a hyperplane through $d$ sample points whose empirical error differs by at most $d/n$. The intuition is that two hyperplanes can agree on all but the points lying on the separating plane; those are at most $d$ points. This reduces ERM for hyperplanes to ERM over a finite class of size $2\binom{n}{d}$, so uniform convergence still holds. In particular, for $n \geq d$ and $\varepsilon \geq 2d/n$, one obtains bounds of the form
+\[
+    \mathbb{P}\left(R(\hat{c}) > \inf_{c \in \mathcal{C}} R(c) + \varepsilon\right)
+    \leq 2 \binom{n}{d} \exp\left(-\frac{n\varepsilon^2}{2}\right),
+\]
+illustrating a polynomial prefactor in $n^d$ and an exponential decay in $n\varepsilon^2$. For fixed dimension $d$, the deviation probability still vanishes rapidly as $n$ grows, confirming learnability without distributional assumptions.
+
+If the best linear classifier has zero error ($R(c^\star)=0$), the convergence rate improves: the probability of an $\varepsilon$-bad classifier scales like
+\[
+    \mathbb{P}\left(R(\hat{c}_n) > \varepsilon\right) \leq 2 \binom{n}{d} \exp\bigl(-\varepsilon (n-d)\bigr),
+\]
+since errors can occur only on the $n-d$ points not used to define the separating hyperplane. This yields an $\exp(-n\varepsilon)$ dependence rather than $\exp(-n\varepsilon^2)$.
+
+\begin{notebox}
+Finding the optimal dichotomy of $n$ labeled points in $\mathbb{R}^d$ is NP-hard in the worst case, so ERM for hyperplanes can be computationally difficult even though it is statistically learnable.
+\end{notebox}
 
 \subsection{Strong and Weak Learning Perspectives}
 The PAC condition can be relaxed to \emph{weak learning}: instead of demanding arbitrarily small $\varepsilon$, one requires $R(\hat{c}) \leq \tfrac{1}{2} - \gamma$ for some fixed $\gamma > 0$ with high probability. Weak learners are tractable building blocks for ensemble methods such as boosting, which combine many slightly better-than-random hypotheses into a strongly consistent classifier. In contrast, strong PAC learning ensures $(\varepsilon,\delta)$ guarantees for every positive pair. Both notions rely on the same vocabulary—generalization error, sample complexity, and hypothesis class capacity—and highlight the central PAC message: learnability hinges on balancing expressive power with the ability to control error uniformly over the data-generating process.
