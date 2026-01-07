@@ -19,6 +19,8 @@ meaning the affine tangent is a global under-estimator. If $f$ is twice differen
 \]
 implying a unique minimizer and improved convergence rates.
 
+A constrained optimization problem minimizes an objective subject to equality and inequality constraints. It is convex when the objective and inequality constraints are convex and the equality constraints are affine, so the feasible set is convex.
+
 A generic convex optimization problem reads
 \[
 \begin{aligned}
@@ -28,6 +30,23 @@ A generic convex optimization problem reads
 \end{aligned}
 \]
 where each $f_i$ is convex and the equality constraints define an affine set. The feasible set $\{x \mid f_i(x) \le 0, Ax=b\}$ must be nonempty for the problem to be well-posed. Convexity ensures that any Karush--Kuhn--Tucker (KKT) point is globally optimal.
+
+\subsection{Illustrative example: closest point on a disk}
+Consider a drone at $(x_0, y_0, z_0)$ and a person restricted to the flat disk $\{(x, y, 0) \mid x^2 + y^2 \le r\}$. The closest point solves
+\[
+\min_{x,y,z}\ \tfrac{1}{2}\|(x, y, z) - (x_0, y_0, z_0)\|_2^2 \quad \text{s.t.}\quad z = 0,\; x^2 + y^2 \le r.
+\]
+Let $f(x, y, z) = \tfrac{1}{2}\|(x, y, z) - (x_0, y_0, z_0)\|_2^2$, $g(x, y, z) = z$, and $h(x, y, z) = x^2 + y^2 - r$. Then
+\begin{align*}
+    \nabla f(x, y, z) &= (x - x_0, y - y_0, z - z_0), \\
+    \nabla g(x, y, z) &= (0, 0, 1), \\
+    \nabla h(x, y, z) &= (2x, 2y, 0).
+\end{align*}
+At an optimum, there exist multipliers $\lambda \in \mathbb{R}$ and $\alpha \ge 0$ such that
+\[
+    \nabla f(x, y, z) + \lambda \nabla g(x, y, z) + \alpha \nabla h(x, y, z) = 0,
+\]
+together with $z=0$, $x^2 + y^2 \le r$, and $\alpha (x^2 + y^2 - r) = 0$. This captures whether the closest point lies in the interior of the disk ($\alpha = 0$) or on the boundary ($\alpha > 0$).
 
 \subsection{Standard convex programs in machine learning}
 Many estimators from earlier chapters fit this template:
@@ -51,11 +70,13 @@ For
 \[
 \min_x f_0(x) \quad \text{s.t.}\quad f_i(x) \le 0,\, Ax = b,
 \]
-introduce multiplier $\lambda \ge 0$ for inequalities and $\nu$ for equalities. The \textbf{Lagrangian}
+introduce multiplier $\lambda \ge 0$ for inequalities and $\nu$ for equalities. The \textbf{Lagrangian} is
 \[
     \mathcal{L}(x, \lambda, \nu) = f_0(x) + \sum_{i=1}^m \lambda_i f_i(x) + \nu^\top (Ax - b)
 \]
-lower-bounds the primal objective: $g(\lambda, \nu) = \inf_x \mathcal{L}(x, \lambda, \nu) \le f_0(x)$ for all feasible $x$. The \textbf{dual problem} maximizes $g(\lambda,\nu)$ subject to $\lambda \ge 0$. Weak duality ($g \le p^\star$) always holds, while \textbf{strong duality} ($g^\star = p^\star$) holds under mild constraint qualifications such as Slater's condition (strict feasibility). Dual variables often have sensitivity interpretations, e.g., the effect of tightening constraints.
+Intuitively, it adds weighted penalties for constraint violations to the objective: $\lambda$ (with $\lambda \ge 0$) acts like a price for violating $f_i(x) \le 0$, while $\nu$ enforces the equality $Ax=b$. The saddle-point view is that we minimize over $x$ but maximize over multipliers ($\lambda, \nu$), so any violation is punished at the optimum, yielding feasibility and the KKT conditions.
+
+The Lagrangian lower-bounds the primal objective: $g(\lambda, \nu) = \inf_x \mathcal{L}(x, \lambda, \nu) \le f_0(x)$ for all feasible $x$. The \textbf{dual problem} maximizes $g(\lambda,\nu)$ subject to $\lambda \ge 0$. Weak duality ($g \le p^\star$) always holds, where $p^\star$ is the optimal primal value, while \textbf{strong duality} ($g^\star = p^\star$) holds under mild constraint qualifications such as Slater's condition (strict feasibility: there exists $x$ with $f_i(x) < 0$ and $Ax=b$). Dual variables often have sensitivity interpretations, e.g., the effect of tightening constraints. The dual trades the original constraints for a typically more complex objective but a simpler feasible set, which can make problems like SVMs easier to solve.
 
 The \textbf{KKT conditions} describe optimality when strong duality holds:
 \begin{align*}
@@ -66,47 +87,5 @@ The \textbf{KKT conditions} describe optimality when strong duality holds:
 \end{align*}
 For unconstrained problems these reduce to $\nabla f_0(x^\star) = 0$, consistent with calculus. In SVMs, for example, KKT implies that only points on the margin have non-zero dual variables, explaining sparsity in the dual solution.
 
-\subsection{First-order algorithms}
-Most large-scale machine learning problems rely on first-order (gradient-based) methods with low per-iteration cost.
-\begin{itemize}
-    \item \textbf{Gradient descent (GD).} Iterate $x_{k+1} = x_k - \eta_k \nabla f(x_k)$. For $L$-smooth convex $f$, constant step-size $\eta = 1/L$ yields $f(x_k) - f^\star \le \tfrac{L\|x_0 - x^\star\|^2}{2k}$. If $f$ is additionally $m$-strongly convex, the error contracts linearly: $f(x_k) - f^\star \le \left(1 - \tfrac{m}{L}\right)^k (f(x_0) - f^\star)$.
-    \item \textbf{Projected gradient.} For constrained problems with easy projections $\Pi_C$, update $x_{k+1} = \Pi_C(x_k - \eta \nabla f(x_k))$. This applies to simplex constraints, $\ell_2$-balls, or PSD cones (via eigenvalue thresholding).
-    \item \textbf{Subgradient methods.} When $f$ is convex but nonsmooth (e.g., hinge or $\ell_1$ norms), use $x_{k+1} = x_k - \eta g_k$ with $g_k \in \partial f(x_k)$. Convergence is $O(1/\sqrt{k})$ for general convex functions.
-    \item \textbf{Accelerated methods.} Nesterov's accelerated gradient adds a momentum term achieving $f(x_k) - f^\star = O(1/k^2)$ for $L$-smooth convex objectives, approaching optimal complexity for first-order methods.
-    \item \textbf{Stochastic gradients.} SGD and its variants (momentum, Adam, Adagrad) replace $\nabla f$ with unbiased estimates, giving scalable training on massive datasets. Convexity enables convergence proofs, e.g., $\mathbb{E}[f(\bar{x}_k)] - f^\star = O(1/\sqrt{k})$ with diminishing steps.
-\end{itemize}
-
-\subsection{Second-order and interior-point methods}
-Second-order methods leverage curvature for faster local convergence.
-\begin{itemize}
-    \item \textbf{Newton's method.} Update $x_{k+1} = x_k - \nabla^2 f(x_k)^{-1} \nabla f(x_k)$. Under mild conditions, Newton steps enjoy quadratic convergence near $x^\star$, but each iteration requires solving a linear system (often via Cholesky or conjugate gradients). Damped Newton with line search ensures global convergence for convex $f$.
-    \item \textbf{Quasi-Newton methods.} BFGS or L-BFGS approximate Hessians by low-rank updates, offering superlinear convergence without storing the full Hessian. Widely used for logistic regression and other smooth convex losses.
-    \item \textbf{Interior-point methods (IPM).} For constrained problems, IPMs solve a sequence of barrier subproblems
-    \[
-        \phi_\mu(x) = f_0(x) - \mu \sum_{i=1}^m \log(-f_i(x))
-    \]
-    using Newton steps. As $\mu \rightarrow 0$, solutions trace the \textit{central path} toward the primal optimum while satisfying constraints. IPMs bring polynomial-time worst-case guarantees for LPs, QPs, SOCPs, and SDPs, albeit with higher per-iteration complexity than first-order methods.
-\end{itemize}
-
-\subsection{Proximal, splitting, and decomposition techniques}
-When $f = g + h$ with $g$ smooth and $h$ simple but possibly nonsmooth, \textbf{proximal methods} exploit the proximal operator
-\[
-    \operatorname{prox}_{\eta h}(v) = \arg\min_x \left\{ h(x) + \frac{1}{2\eta}\|x - v\|^2 \right\}.
-\]
-Common examples include soft-thresholding (for $\ell_1$ norms) or projection onto convex sets. Algorithms include:
-\begin{itemize}
-    \item \textbf{Proximal gradient / ISTA}: $x_{k+1} = \operatorname{prox}_{\eta h}(x_k - \eta \nabla g(x_k))$. FISTA accelerates this to $O(1/k^2)$ convergence.
-    \item \textbf{Alternating direction method of multipliers (ADMM)}: solves $\min_x g(x) + h(z)$ subject to $Mx + Nz = c$ by alternating minimization with dual updates. ADMM decomposes problems across blocks, enabling distributed or parallel implementations (e.g., consensus optimization).
-    \item \textbf{Augmented Lagrangian methods}: strengthen dual ascent by penalizing constraint violation quadratically, improving stability compared to vanilla dual methods.
-\end{itemize}
-
-\subsection{Sensitivity, certificates, and modeling tips}
-\begin{itemize}
-    \item \textbf{Dual variables as sensitivities.} At optimum, $\lambda_i^\star$ equals the marginal increase in the optimal value if constraint $i$ is tightened. Inspecting $\lambda^\star$ highlights bottleneck constraints or active data points.
-    \item \textbf{Certificates of optimality.} A feasible primal-dual pair satisfying KKT provides a certificate. Numerically, interior-point solvers report the primal-dual gap $\|f(x) - g(\lambda,\nu)\|$, which bounds suboptimality.
-    \item \textbf{Scaling.} Normalize features and constraints so that Hessians and gradients are well-conditioned; this accelerates both first- and second-order methods.
-    \item \textbf{Modeling systems.} Packages like CVX, CVXPY, or disciplined convex programming (DCP) frameworks enforce convexity by construction, automatically converting high-level specifications into standard cone programs.
-    \item \textbf{Stopping criteria.} Monitor residuals, objective gaps, and constraint violation simultaneously; mere gradient norm may be insufficient when constraints are present.
-\end{itemize}
-
-Convex optimization thus supplies the theoretical backbone for many machine learning estimators and algorithms: it furnishes tractable objectives, certifiable solutions, and scalable methods tailored to problem structure. Understanding duality and algorithmic trade-offs lets practitioners choose the right solver for each model in the AML toolbox.
+\subsection{Solving convex optimization problems}
+When Slater's condition holds, the KKT conditions are necessary and sufficient. A direct strategy is to solve the KKT system (stationarity, primal feasibility, dual feasibility, and complementary slackness) for $x^\star$, $\lambda^\star$, and $\nu^\star$. If this system is intractable, solve the dual problem instead; under strong duality, primal solutions can be recovered from the dual optimum using stationarity and complementary slackness.
