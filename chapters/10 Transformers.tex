@@ -1,1 +1,98 @@
 \section{Transformers}
+
+Transformers are sequence models built around attention. Instead of processing tokens strictly left-to-right, they let every token form a context-aware representation by looking at other tokens. The narrative of the chapter is: (i) represent text as token embeddings, (ii) learn how tokens attend to each other via self-attention, (iii) extend attention to multiple relations and to encoder--decoder settings, and (iv) add position and depth to form the full transformer architecture.
+
+\subsection{Tokenization and embeddings}
+Text must be converted into discrete tokens. A common approach is WordPiece tokenization, which builds a vocabulary of size $S$ by merging frequent character pairs:
+\begin{enumerate}
+    \item Initialize the token set with all characters appearing in the corpus.
+    \item While the set size exceeds $S$, repeatedly merge the most frequent adjacent token pair.
+\end{enumerate}
+Each token is mapped to a learnable embedding in $\mathbb R^d$. Stacking all token vectors yields an embedding matrix $E \in \mathbb R^{S \times d}$. For a token sequence $t_1,\ldots,t_N$, the model selects the corresponding rows of $E$ to build a matrix $X \in \mathbb R^{N \times d}$. In classification tasks, a special token like \texttt{[CLS]} is added so its final embedding can represent the whole sequence.
+
+\subsection{Self-attention: context for each token}
+Self-attention builds a new representation for each token by mixing information from all other tokens. The mechanism assigns a weight to every pair of positions and uses these weights to take a weighted average of value vectors.
+
+Given input embeddings $X \in \mathbb R^{N \times d}$, define
+\[
+    Q = X W_Q, \qquad K = X W_K, \qquad V = X W_V,
+\]
+where $W_Q, W_K, W_V \in \mathbb R^{d \times d_k}$. The attention weights are
+\[
+    S = \operatorname{softmax}\left(\frac{Q K^\top}{\sqrt{d_k}}\right),
+\]
+with softmax applied row-wise, and the attention output is
+\[
+    A = S V.
+\]
+The $(i,j)$ entry of $S$ measures how much token $i$ attends to token $j$. Each output row $A_i$ is therefore a weighted average of value vectors, which means each token representation is rewritten using a context-dependent mixture of other tokens.
+
+\begin{notebox}
+The scaling by $\sqrt{d_k}$ keeps dot products in a reasonable range. Without it, $Q K^\top$ grows in magnitude with dimension, causing the softmax to saturate and gradients to vanish. The scaling normalizes the variance of the scores so attention remains learnable.
+\end{notebox}
+
+\subsection{Attention as information retrieval}
+Attention can be interpreted as a retrieval mechanism. Each token produces a query vector that asks, \emph{which other tokens are relevant to me?} Keys describe how each token can be matched, and values are the information retrieved. The softmax turns the query--key similarities into a probability distribution, so the output is a weighted average of values. This perspective explains why attention helps disambiguate word meaning: a token like \emph{bat} can retrieve different context depending on whether nearby words indicate sports or animals.
+
+\subsection{Multi-head attention}
+A single attention map captures one kind of relation, but language contains many relations at once (subject--verb, modifier--noun, long-range coreference). Multi-head attention learns several attention maps in parallel. For head $h$,
+\[
+    Q_h = X W_Q^{(h)}, \quad K_h = X W_K^{(h)}, \quad V_h = X W_V^{(h)}, \quad A_h = \operatorname{softmax}\left(\frac{Q_h K_h^\top}{\sqrt{d_k}}\right) V_h.
+\]
+The head outputs are concatenated and projected:
+\[
+    \operatorname{MHA}(X) = \operatorname{Concat}(A_1, \ldots, A_H) W_O.
+\]
+The intuition is that different heads specialize to different relational patterns, and concatenation preserves these diverse views before the final mixing step.
+
+\subsection{Cross-attention}
+In tasks like translation, an output token should attend not only to previous output tokens but also to the input sentence. Cross-attention does this by forming queries from the target sequence and keys/values from the source sequence. If $X_s$ are source embeddings and $X_t$ are target embeddings, then
+\[
+    Q = X_t W_Q, \qquad K = X_s W_K, \qquad V = X_s W_V,
+\]
+so each target position retrieves information from the source. This gives a direct, learnable alignment between the two sequences.
+
+\subsection{Masked self-attention for autoregressive decoding}
+When generating text left-to-right, a token must not look at future positions. This is enforced by a causal mask $M \in \{0,1\}^{N \times N}$ that zeroes out disallowed positions. If $P = Q K^\top / \sqrt{d_k}$ are the raw scores, we apply
+\[
+    P_M = \mu(P, M), \qquad \mu(p, m) = \begin{cases}
+        p & m = 1 \\
+        -\infty & m = 0
+    \end{cases}
+\]
+and then compute $S = \operatorname{softmax}(P_M)$. The $-\infty$ entries become zeros after softmax, ensuring each position only attends to the past. This preserves the autoregressive factorization while keeping the attention computation parallelizable across positions.
+
+\subsection{Positional encodings}
+Self-attention alone is permutation equivariant: reordering tokens simply reorders the outputs. To inject order, a positional encoding matrix $P \in \mathbb R^{T \times d}$ is added to the token embeddings, where $T$ is the maximum sequence length. A common deterministic scheme uses sinusoids:
+\[
+    P_{i, 2j} = \sin\left( i \cdot \alpha^{-2j} \right), \qquad
+    P_{i, 2j+1} = \cos\left( i \cdot \alpha^{-2j} \right), \qquad
+    \alpha = 10^{4/d}.
+\]
+These features provide multiple periodicities, allowing the model to represent both absolute and relative positions. Adding $P$ to token embeddings keeps the dimensionality fixed; concatenation would increase parameters and would be less compatible with the linear structure of attention and feed-forward layers.
+
+\subsection{Residual connections and normalization}
+Deep networks can suffer from degradation: accuracy drops as depth grows because information and gradients struggle to pass through many layers. Transformers address this by using residual connections and layer normalization. Each sublayer is wrapped as
+\[
+    \operatorname{AddNorm}(x) = \operatorname{LayerNorm}(x + \operatorname{Sublayer}(x)).
+\]
+The residual path preserves the original signal, while normalization stabilizes the scale of activations. Together, they enable very deep stacks of attention and feed-forward blocks.
+
+\subsection{The transformer block and full architecture}
+An encoder block consists of multi-head self-attention followed by a position-wise feed-forward network (FFN):
+\[
+    \operatorname{FFN}(z) = W_2 \sigma(W_1 z + b_1) + b_2,
+\]
+applied independently to each position. The encoder stacks $L$ such blocks.
+
+A decoder block contains masked self-attention, cross-attention to the encoder output, and an FFN, each with Add\&Norm. The final decoder representations are mapped to vocabulary logits by a linear layer and softmax, producing a distribution over the next token.
+
+This architecture combines parallelizable self-attention with explicit alignment via cross-attention, making it effective for translation, summarization, and many other sequence tasks.
+
+\subsection{BERT as an encoder-only transformer}
+BERT uses only the encoder stack. It is pre-trained on large corpora with two objectives:
+\begin{itemize}
+    \item \textbf{Masked language modeling (MLM):} randomly mask input tokens and predict them from context.
+    \item \textbf{Next sentence prediction (NSP):} classify whether one sentence follows another.
+\end{itemize}
+After pre-training, the model is fine-tuned for downstream tasks such as question answering or sentence classification. The key intuition is that bidirectional self-attention yields contextual embeddings that can be specialized with minimal task-specific changes.
