@@ -1,1 +1,90 @@
 \section{Neural Networks}
+
+Neural networks are parameterized function families that represent a predictor as a composition of simple building blocks. Each layer applies an affine map followed by a nonlinearity. Stacking many such layers yields a flexible function that can model complicated input--output relationships while still being differentiable, which makes gradient-based training possible. The structure of this chapter is therefore: (i) define the forward computation, (ii) specify a loss and optimization objective, and (iii) derive how gradients flow backward through the composition.
+
+\subsection{Forward computation and parameterization}
+Let the network depth be $L$ and define the parameters $\theta = \{W_i, b_i\}_{i=0}^{L-1}$. For an input $x \in \mathcal X$, we write the forward pass as
+\[
+    z_0 = x, \qquad \alpha_i = W_i z_i + b_i, \qquad z_{i+1} = \phi_i(\alpha_i), \quad i = 0, \ldots, L-1.
+\]
+The output is $z_L = f(x \mid \theta) \in \mathcal Y$. If the $i$-th layer has width $d_i$, then $W_i \in \mathbb R^{d_{i+1} \times d_i}$ and $b_i \in \mathbb R^{d_{i+1}}$. The representation $z_i$ is often called a \emph{hidden state} for $i \in \{1,\ldots,L-1\}$.
+
+The core intuition is that each layer performs a linear projection followed by a nonlinearity. The linear part mixes features; the nonlinearity allows the model to bend space and introduce interactions between features. Depth composes these distortions, creating increasingly abstract representations as information flows toward the output.
+
+\begin{notebox}
+If all $\phi_i$ were linear, then $f(x \mid \theta)$ would collapse to a single linear map, regardless of depth. Nonlinear activations are therefore essential for expressive power.
+\end{notebox}
+
+\subsection{Activation functions and intuition}
+An activation function $\phi$ is typically applied elementwise and is almost everywhere differentiable. Common choices include
+\[
+    \text{sigmoid: } \sigma(a) = \frac{1}{1 + e^{-a}}, \qquad
+    \text{tanh: } \tanh(a) = \frac{e^a - e^{-a}}{e^a + e^{-a}}, \qquad
+    \text{ReLU: } \operatorname{ReLU}(a) = \max(0, a).
+\]
+Sigmoid and tanh saturate for large $|a|$, which can slow learning because their derivatives become small. ReLU is piecewise linear and keeps gradients alive for positive inputs, which helps optimization in deep networks. The choice of $\phi$ shapes both the representational geometry and the optimization landscape.
+
+\subsection{Loss, objective, and gradient descent}
+Given training data $D = \{(x_k, y_k)\}_{k=1}^n$, learning is posed as minimizing an empirical risk. Let $\ell(\hat y, y)$ be a differentiable loss for a single example (e.g., squared error for regression or cross-entropy for classification). The objective is
+\[
+    L(\theta, D) = \frac{1}{n} \sum_{k=1}^n \ell\bigl(f(x_k \mid \theta), y_k\bigr).
+\]
+Gradient descent updates parameters in the direction of steepest decrease:
+\[
+    \theta \leftarrow \theta - \eta \, \nabla_\theta L(\theta, D),
+\]
+with step size (learning rate) $\eta > 0$. In practice, one often uses stochastic or mini-batch variants, but the core algorithm remains the same: repeatedly evaluate gradients and take steps that lower the loss.
+
+\subsection{The chain rule as the engine of backpropagation}
+Training requires computing gradients of the loss with respect to all parameters. Because the network is a composition of functions, the chain rule gives a systematic way to propagate derivatives.
+
+Consider differentiable functions $f : \mathbb R^d \to \mathbb R^m$ and $g : \mathbb R^m \to \mathbb R^n$, with $h = g \circ f$. Let $y = f(x)$ and $z = g(y)$. The Jacobian chain rule states
+\[
+    \frac{\partial h}{\partial x} = \frac{\partial g}{\partial y} \frac{\partial f}{\partial x}.
+\]
+In a computation graph (a directed acyclic graph of intermediate variables), the derivative between two nodes is the sum, over all paths, of the product of local derivatives along each path. This is the mathematical justification for backpropagation: derivatives can be accumulated by traversing the graph backward.
+\[
+    \frac{\partial x'}{\partial x} = \sum_{(x_0, \\ldots, x_m) \\in \\mathcal{P}(x, x')} \prod_{i=1}^m \\frac{\partial x_i}{\partial x_{i-1}},
+\]
+where $\\mathcal{P}(x, x')$ is the set of all directed paths from $x$ to $x'$ in the graph. Each path contributes a product of local sensitivities; the total derivative is their sum.
+
+\subsection{Backpropagation for a feed-forward network}
+We now apply the chain rule to the layered structure. For a single example, let
+\[
+    \mathcal{L}(x, y; \theta) = \ell(z_L, y)
+\]
+be the loss. Define the \emph{error signal} at layer $i$ as
+\[
+    \delta_i = \frac{\partial \mathcal{L}}{\partial \alpha_i} \in \mathbb R^{d_{i+1}}.
+\]
+The output layer error is
+\[
+    \delta_{L-1} = \nabla_{z_L} \ell(z_L, y) \odot \phi_{L-1}'(\alpha_{L-1}),
+\]
+and for hidden layers, the error propagates backward as
+\[
+    \delta_i = (W_{i+1}^\top \delta_{i+1}) \odot \phi_i'(\alpha_i), \qquad i = L-2, \ldots, 0,
+\]
+where $\odot$ is elementwise multiplication. Once the $\delta_i$ are known, the parameter gradients follow from the linear structure of each layer:
+\[
+    \frac{\partial \mathcal{L}}{\partial W_i} = \delta_i z_i^\top, \qquad \frac{\partial \mathcal{L}}{\partial b_i} = \delta_i.
+\]
+Intuitively, $\delta_i$ measures how much changing the pre-activation $\alpha_i$ would change the loss. The gradient for $W_i$ is then the outer product of this error with the input to the layer, $z_i$, which mirrors the forward computation $\alpha_i = W_i z_i + b_i$.
+
+\begin{derivation}
+For the layer $\alpha_i = W_i z_i + b_i$ and $z_{i+1} = \phi_i(\alpha_i)$, consider a scalar loss $\mathcal{L}$. By the chain rule,
+\[
+    \frac{\partial \mathcal{L}}{\partial W_i} = \frac{\partial \mathcal{L}}{\partial \alpha_i} \frac{\partial \alpha_i}{\partial W_i}.
+\]
+The derivative of $\alpha_i$ with respect to $W_i$ is linear: each entry of $W_i$ affects $\alpha_i$ in proportion to the corresponding entry of $z_i$. In matrix form, this gives
+\[
+    \frac{\partial \mathcal{L}}{\partial W_i} = \delta_i z_i^\top.
+\]
+Similarly, because $\alpha_i$ depends on $b_i$ by simple addition, we obtain $\partial \mathcal{L} / \partial b_i = \delta_i$.
+\end{derivation}
+
+Backpropagation therefore consists of two sweeps: a forward pass that computes $\alpha_i$ and $z_i$ for all layers, and a backward pass that computes $\delta_i$ and parameter gradients. This is efficient because each intermediate quantity is reused, and the total cost is comparable to the forward pass itself.
+
+\begin{notebox}
+The same derivation applies to the full dataset: one either sums gradients over all examples (batch) or estimates them from a subset (mini-batch). In all cases, the gradient structure follows the same backward recursion.
+\end{notebox}
