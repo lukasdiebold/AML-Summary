@@ -131,7 +131,7 @@ Four key problems to overcome for structured prediction are:
     \item \textbf{Efficient training.} Optimization must avoid constraints over all outputs, using methods with runtime sub-linear in the number of classes.
 \end{itemize}
 
-\begin{figure}[h]
+\begin{figure}[ht]
     \centering
     \includegraphics[width=0.7\textwidth]{images/ssvm-1.png}
     \caption{Structured SVM: language parsing example}
@@ -189,7 +189,7 @@ Training typically uses a cutting-plane algorithm that repeatedly performs loss-
 \]
 to add the most violated constraint. Designing $\Psi$, $\Delta$, and efficient inference are the core modeling choices in structured prediction.
 
-\begin{figure}[h]
+\begin{figure}[ht]
     \centering
     \includegraphics[width=0.7\textwidth]{images/ssvm-2.png}
     \caption{Structured SVM Training with Margin Rescaling}
