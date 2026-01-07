@@ -1,12 +1,16 @@
 \section{Support Vector Machines}
 
 For support vector machines (SVMs), we're interested in maximising the margin between classes. So given a dataset $D=\{(x_i, y_i)\}$ with $y_i \in \{-1, +1\}$ and guaranteed linear separability, we want to find a hyperplane defined by $(w, w_0)$ such that $w^T x_i + w_0 > 0$ if $y_i = 1$ and $w^T x_i + w_0 < 0$ if $y_i = -1$. Or in other terms, we want to satisfy the constraints $y_i (w^T x_i + w_0) > 0$ for all $i$.
-The margin is defined as the distance from the hyperplane to the closest data point, which can be expressed as $\frac{2}{\|w\|}$.
+The margin is defined as the distance from the hyperplane to the closest data point, which can be expressed as $\frac{2}{\|w\|}$ (\textit{see derivation below}).
 
 \begin{derivation}
 Given the hyperplane $\{x \mid w^\top x + w_0 = 0\}$, the signed distance of any point $x$ to the hyperplane is
 \[
     \operatorname{dist}(x, \mathcal{H}) = \frac{w^\top x + w_0}{\|w\|}.
+\]
+To see why, let $x_0$ be any point on the hyperplane, so $w^\top x_0 + w_0 = 0$. The vector $w$ is normal to the hyperplane, hence the shortest path from $x$ to $\mathcal{H}$ is along the unit normal $w / \|w\|$. The signed distance is the projection of $x - x_0$ onto this unit normal:
+\[
+    \frac{w^\top (x - x_0)}{\|w\|} = \frac{w^\top x + w_0}{\|w\|}.
 \]
 Because $y_i \in \{-1, +1\}$, we can enforce the scale of $(w, w_0)$ by requiring that the closest points satisfy $y_i (w^\top x_i + w_0) = 1$. Under this normalization, there exist parallel ``margin'' hyperplanes
 \[
@@ -49,7 +53,7 @@ Substituting back gives the dual objective
 \[
     g(\alpha) = \sum_{i=1}^n \alpha_i - \frac{1}{2} \sum_{i,j} \alpha_i \alpha_j y_i y_j x_i^\top x_j = \sum_{i=1} \alpha _i - \frac{1}{2} || w(\alpha) ||^2,
 \]
-with constraints $\alpha_i \ge 0$ and $\sum_i \alpha_i y_i = 0$. Hence the dual problem is the quadratic program
+where $w(\alpha) = \sum_i \alpha_i y_i x_i$ is the primal weight vector written in terms of the dual variables. The constraints are $\alpha_i \ge 0$ and $\sum_i \alpha_i y_i = 0$. Hence the dual problem is the quadratic program
 \[
 \begin{aligned}
     \max_{\alpha \in \mathbb{R}^n}\quad & \sum_{i=1} \alpha _i - \frac{1}{2} || w(\alpha) ||^2 \\
@@ -61,4 +65,145 @@ This dual depends only on inner products $x_i^\top x_j$, enabling the kernel tri
 
 \begin{notebox}
 The dual formulation is preferable when $n$ (number of samples) is smaller than $d$ (feature dimension) or when kernels project data into high-dimensional spaces. It also highlights that margin maximization depends only on a sparse subset of training examples.
+\end{notebox}
+
+\subsection{Kernelized SVMs}
+Linear SVMs can be extended by mapping inputs into a feature space $\phi(x)$ and learning a linear separator there. The kernel trick replaces inner products with a kernel function $k(x_i, x_j) = \phi(x_i)^\top \phi(x_j)$, so the dual becomes
+\[
+    \max_{\alpha}\quad \sum_{i=1}^n \alpha_i - \frac{1}{2} \sum_{i,j} \alpha_i \alpha_j y_i y_j k(x_i, x_j)
+\]
+subject to $\alpha_i \ge 0$ and $\sum_i \alpha_i y_i = 0$. The decision function depends only on kernel evaluations:
+\[
+    f(x) = \sum_{i=1}^n \alpha_i^\star y_i k(x_i, x) + w_0^\star,\quad \hat y = \operatorname{sign}(f(x)).
+\]
+Common kernels include linear ($x^\top z$), polynomial ($(x^\top z + c)^p$), and RBF ($\exp(-\|x-z\|^2/(2\sigma^2))$). Valid kernels must correspond to a positive semidefinite Gram matrix (Mercer's condition).
+
+\subsection{Soft-margin SVMs}
+When the data are not perfectly separable, we introduce slack variables $\xi_i \ge 0$ to allow margin violations and penalize them in the objective:
+\[
+\begin{aligned}
+    \min_{w, w_0, \xi}\quad & \frac{1}{2} \|w\|^2 + C \sum_{i=1}^n \xi_i \\
+    \text{s.t.}\quad & y_i (w^\top x_i + w_0) \ge 1 - \xi_i,\quad i=1,\ldots,n.
+\end{aligned}
+\]
+Intuitively, each $\xi_i$ measures how much sample $i$ violates the margin: $\xi_i = 0$ is on or outside the margin, $0 < \xi_i < 1$ is inside the margin but correctly classified, and $\xi_i \ge 1$ is misclassified. The parameter $C$ trades off margin width against violations: large $C$ penalizes errors heavily (closer to hard margin), while small $C$ allows more violations to achieve a wider margin and better generalization.
+The parameter $C$ controls the trade-off between a wide margin and fewer violations. The dual is the same as the hard-margin case but with box constraints:
+\[
+    \max_{\alpha}\quad \sum_{i=1}^n \alpha_i - \frac{1}{2} \sum_{i,j} \alpha_i \alpha_j y_i y_j x_i^\top x_j
+    \quad \text{s.t.}\quad 0 \le \alpha_i \le C,\ \sum_i \alpha_i y_i = 0.
+\]
+Soft-margin SVMs correspond to minimizing the hinge loss $\max(0, 1 - y_i f(x_i))$ plus $\tfrac{1}{2}\|w\|^2$ regularization.
+
+\subsection{Multiclass SVMs}
+For $K$ classes, a linear multiclass SVM learns one weight vector per class, $w_1,\ldots,w_K$, with scores $s_k(x) = w_k^\top x + w_{k,0}$. Prediction uses
+\[
+    \hat y = \arg\max_{k \in \{1,\ldots,K\}} s_k(x).
+\]
+The Crammer--Singer margin requires the correct class to outscore all others by at least $m$:
+\[
+    (w_{y_i}^\top x_i + w_{y_i,0}) - \max_{k \ne y_i} (w_k^\top x_i + w_{k,0}) \ge m,\quad \forall i.
+\]
+This enforces a gap between the true class score and the best competing class, generalizing the binary margin to $K$-way discrimination.
+The hard-margin formulation is
+\[
+\min_{\{w_k,w_{k,0}\}} \frac{1}{2}\sum_{k=1}^K \|w_k\|^2 \quad \text{s.t. the margin constraints above. (with $m=1$)}
+\]
+For non-separable data, introduce slacks $\xi_i \ge 0$:
+\[
+\begin{aligned}
+    \min_{\{w_k,w_{k,0}\}, \xi}\quad & \frac{1}{2}\sum_{k=1}^K \|w_k\|^2 + C \sum_{i=1}^n \xi_i \\
+    \text{s.t.}\quad & (w_{y_i}^\top x_i + w_{y_i,0}) - \max_{k \ne y_i} (w_k^\top x_i + w_{k,0}) \ge 1 - \xi_i.
+\end{aligned}
+\]
+The slack $\xi_i$ measures how much the best incorrect class score overtakes the required margin; $\xi_i = 0$ means the example is correctly classified with margin, while $\xi_i > 0$ indicates a margin violation or misclassification.
+This is the multiclass analogue of the hinge-loss SVM and can be viewed as a special case of structured prediction with $\mathcal{K} = \{1,\ldots,K\}$.
+
+An example application is phoneme classification, where each audio frame must be assigned one of several phoneme labels. The multiclass SVM learns to discriminate among all phonemes simultaneously, maximizing the margin between the correct phoneme and the most confusable alternatives.
+
+\subsection{Structured SVMs}
+Structured SVMs extend SVMs to structured outputs $z \in \mathcal{K}$ (e.g., sequences, trees, segmentations). An example is part-of-speech tagging.
+
+Four key problems to overcome for structured prediction are:
+\begin{itemize}
+    \item \textbf{Compact output representation.} Even one parameter per structured label is infeasible; we need shared representations to avoid a parameter blow-up.
+    \item \textbf{Efficient prediction.} Enumerating all outputs is intractable, so inference must exploit structure for fast maximization.
+    \item \textbf{Prediction error.} Losses must reflect partial correctness (e.g., a nearly correct parse should be penalized less than a completely wrong one).
+    \item \textbf{Efficient training.} Optimization must avoid constraints over all outputs, using methods with runtime sub-linear in the number of classes.
+\end{itemize}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/ssvm-1.png}
+    \caption{Structured SVM: language parsing example}
+    \label{fig:ssvm-1}
+\end{figure}
+
+The structured SVM framework generalizes binary and multiclass SVMs by replacing binary labels with a joint feature map $\Psi(z, y)$ and score function
+\[
+    f_w(z, y) = w^\top \Psi(z, y).
+\]
+so the number of features depends on the dimensionality of the joint feature map only and is ”independent” of the number of classes. Prediction is
+\[
+    \hat z = \arg\max_{z \in \mathcal{K}} f_w(z, y),
+\]
+which requires efficient inference over the structured output space.
+
+For training pairs $(y_i, z_i)$, the hard-margin formulation enforces a structured margin:
+\[
+    w^\top \Psi(z_i, y_i) - \max_{z \ne z_i} w^\top \Psi(z, y_i) \ge 1,\quad \forall i.
+\]
+
+This definition yields the optimization problem for hard functional margin SSVMs:
+\[
+\begin{array}{ll}
+\min _{\mathbf{w}} & \frac{1}{2} \mathbf{w}^{\top} \mathbf{w} \\
+\text { s.t. } & \mathbf{w}^{\top} \boldsymbol{\Psi}\left(z_i, \mathbf{y}_i\right)-\max _{z \neq z_i} \mathbf{w}^{\top} \boldsymbol{\Psi}\left(z, \mathbf{y}_i\right) \geq 1 \quad \forall \mathbf{y}_i \in \mathcal{Y}
+\end{array}
+\]
+
+Classification requires computing
+\[
+\hat{z}:=h(\mathbf{y})=\arg \max _{z \in \mathbb{K}} f_{\mathbf{w}}(z, \mathbf{y})
+\]
+
+This is in general a hard combinatorial problem. For efficient classification, there must be some kind of structural matching between the compositional structure of the outputs $z$ and the designed joint feature map $\Psi$. For example:
+\begin{itemize}
+    \item Decomposable output spaces: The output space $\mathbb{K}$ can be decomposed into non-overlapping independent parts s.t. $\mathbb{K}=\mathbb{K}_1 \times \ldots \times \mathbb{K}_m$ (and $\Psi$ respects this decomposition), then maximization can be performed part-wise.
+    \item Specific dependency structures: A more general case is captured by Markov networks. Let $z$ be a vector of random variables and $\boldsymbol{\Psi}(z, \mathbf{y})$ represent sufficient statistics of a conditional exponential model $P(z \mid \mathbf{y})$. Then, maximizing $f_{\mathbf{w}}(z, \mathbf{y})$ corresponds to finding the most probable output $\arg \max _z P(z \mid \mathbf{y})$. Fast inference methods available (e.g. Junction tree algorithm, Viterbi algorithm), depending on the dependency structure of $z$.
+\end{itemize}
+
+When data are not separable, introduce slacks and a task loss $\Delta(z, z_i)$ to rescale the margin (margin rescaling):
+\[
+\begin{aligned}
+    \min_{w, \xi \ge 0}\quad & \frac{1}{2}\|w\|^2 + C \sum_{i=1}^n \xi_i \\
+    \text{s.t.}\quad & w^\top \Psi(z_i, y_i) - w^\top \Psi(z, y_i) \ge \Delta(z, z_i) - \xi_i,\ \forall i,\ \forall z \ne z_i.
+\end{aligned}
+\]
+Equivalently,
+\[
+    w^\top \Psi(z_i, y_i) - \max_{z \ne z_i} \bigl[\Delta(z, z_i) + w^\top \Psi(z, y_i)\bigr] \ge -\xi_i.
+\]
+Training typically uses a cutting-plane algorithm that repeatedly performs loss-augmented inference
+\[
+    \tilde z = \arg\max_{z \in \mathcal{K}} \Delta(z, z_i) + w^\top \Psi(z, y_i)
+\]
+to add the most violated constraint. Designing $\Psi$, $\Delta$, and efficient inference are the core modeling choices in structured prediction.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{images/ssvm-2.png}
+    \caption{Structured SVM Training with Margin Rescaling}
+    \label{fig:ssvm-2}
+\end{figure}
+
+So, to apply structures SVMs to a new task we need to design/implement the following four functions:
+\begin{itemize}
+    \item A joint feature map $\Psi(z, y)$ that captures relevant relationships between inputs and structured outputs.
+    \item A loss function $\Delta(z, z_i)$ that quantifies the cost of predicting $z$ when the true output is $z_i$.
+    \item Loss augmented inference to efficiently solve $\arg\max_{z \in \mathcal{K}} \Delta(z, z_i) + w^\top \Psi(z, y_i)$ during training.
+    \item Prediction rule to efficiently solve $\arg\max_{z \in \mathcal{K}} w^\top \Psi(z, y)$ at test time.
+\end{itemize}
+
+\begin{notebox}
+\textbf{Privacy note.} SVM models can leak information about the data they were trained on because support vectors are stored implicitly (and sometimes explicitly) in the learned model. If test or sensitive data are inadvertently included during training, those examples can be memorized and potentially exposed through model inspection or membership inference.
 \end{notebox}
