@@ -44,9 +44,9 @@ Consider differentiable functions $f : \mathbb R^d \to \mathbb R^m$ and $g : \ma
 \]
 In a computation graph (a directed acyclic graph of intermediate variables), the derivative between two nodes is the sum, over all paths, of the product of local derivatives along each path. This is the mathematical justification for backpropagation: derivatives can be accumulated by traversing the graph backward.
 \[
-    \frac{\partial x'}{\partial x} = \sum_{(x_0, \\ldots, x_m) \\in \\mathcal{P}(x, x')} \prod_{i=1}^m \\frac{\partial x_i}{\partial x_{i-1}},
+    \frac{\partial x'}{\partial x} = \sum_{(x_0, \ldots, x_m) \in \mathcal{P}(x, x')} \prod_{i=1}^m \frac{\partial x_i}{\partial x_{i-1}},
 \]
-where $\\mathcal{P}(x, x')$ is the set of all directed paths from $x$ to $x'$ in the graph. Each path contributes a product of local sensitivities; the total derivative is their sum.
+where $\mathcal{P}(x, x')$ is the set of all directed paths from $x$ to $x'$ in the graph. Each path contributes a product of local sensitivities; the total derivative is their sum.h
 
 \subsection{Backpropagation for a feed-forward network}
 We now apply the chain rule to the layered structure. For a single example, let
