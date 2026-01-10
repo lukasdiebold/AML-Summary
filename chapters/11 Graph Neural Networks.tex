@@ -1,1 +1,60 @@
 \section{Graph Neural Networks}
+
+Graphs encode relational data: molecules are atoms connected by bonds, social networks are people connected by interactions, and knowledge bases are entities linked by facts. A graph is a pair $G = (V, E)$ with vertices $V$ and edges $E \subseteq V \times V$. In many learning problems, vertices (and sometimes edges) carry features. We will focus on node-annotated graphs, where each vertex $v \in V$ has a feature vector $h_v \in \mathbb R^{d}$, and on undirected graphs for clarity. The main goal is to learn a function $f^*$ that maps graphs to targets (graph-level prediction) or to labels per node (node-level prediction), while respecting the symmetries of graphs.
+
+\subsection{Graphs, annotations, and learning objectives}
+Let $p^*$ be a distribution over annotated graphs and let $f^*$ be an unknown target function. We want a model $f$ such that $f(G)$ approximates $f^*(G)$ for $G \sim p^*$. A core constraint is \emph{permutation invariance}: reordering vertices should not change the graph-level prediction, and should only reorder the node-level outputs. Any graph neural network (GNN) must therefore aggregate information in a way that ignores the arbitrary indexing of nodes.
+
+\subsection{From layers to graph filters}
+Standard neural networks repeatedly apply a linear map followed by a nonlinearity, and convolutional networks do the same but on local image patches. Graphs do not have a fixed grid, so the local patch around a node must be defined by connectivity. The natural choice is the node and its neighbors.
+
+Let $N(u)$ be the neighbors of node $u$ and let $\deg(u)$ be its degree. A widely used graph convolutional update is
+\[
+    h_u^{(\ell+1)} = \phi\left(\frac{1}{\sqrt{1 + \deg(u)}} \sum_{v \in N(u) \cup \{u\}} \frac{1}{\sqrt{1 + \deg(v)}} h_v^{(\ell)} W^{(\ell)}\right),
+\]
+where $h_v^{(\ell)}$ is the feature vector (hidden state) of node $v$ at layer $\ell$, $W^{(\ell)}$ is a learnable matrix, and $\phi$ is an elementwise activation. The symmetric scaling by $\sqrt{1 + \deg(\cdot)}$ keeps feature magnitudes comparable across nodes with different degrees.
+
+The two degree factors can be read as symmetric normalization. Scaling by $1/\sqrt{1+\deg(v)}$ limits how much a high-degree sender can contribute to many neighbors, while $1/\sqrt{1+\deg(u)}$ prevents a high-degree receiver from accumulating excessive mass. Together they yield the normalized operator $\tilde D^{-1/2} \tilde A \tilde D^{-1/2}$, which is symmetric on undirected graphs, keeps eigenvalues in a stable range, and makes repeated message passing behave like a degree-aware averaging rather than an explosion or collapse driven by hubs.
+
+In matrix form, stack node features as rows in $H^{(\ell)} \in \mathbb R^{n \times d}$, add self-loops to the adjacency matrix $A$ by defining $\tilde A = A + I$, and let $\tilde D$ be the diagonal degree matrix with $\widetilde{D}_{i i}=1+\operatorname{deg}(i)$ (degree in $\tilde A$). Then
+\[
+    H^{(\ell+1)} = \phi\left(\tilde D^{-1/2} \tilde A \tilde D^{-1/2} H^{(\ell)} W^{(\ell)}\right).
+\]
+The operator $\tilde D^{-1/2} \tilde A \tilde D^{-1/2}$ performs a normalized neighbor average, analogous to a convolutional filter on an irregular domain.
+
+\subsection{Message passing and expressive power}
+The update above is a special case of a \emph{message passing} scheme. At each layer, a node sends a message derived from its current state, receives messages from neighbors, aggregates them (often by sum), and updates its representation. This mirrors distributed graph algorithms, where local communication and computation are iterated to compute global properties.
+
+This connection explains why GNNs are expressive. Message passing algorithms can implement procedures such as breadth-first search or shortest paths, and GNNs can be seen as differentiable, learnable versions of such algorithms. Formal results show that message passing GNNs are universal approximators of graph functions when given sufficient width and depth: by stacking enough layers and choosing appropriate nonlinear transformations, they can approximate any continuous function that respects graph symmetry.
+
+\subsection{Oversmoothing as a spectral phenomenon}
+Depth brings a challenge: repeated neighbor averaging can make node representations indistinguishable, a phenomenon known as \emph{oversmoothing}. To see why, define
+\[
+    S = \tilde D^{-1/2} \tilde A \tilde D^{-1/2}.
+\]
+If we temporarily ignore nonlinearities and weight matrices, the update reduces to $H^{(\ell)} = S^\ell X$, where $X$ is the input feature matrix. The matrix $S$ is symmetric with eigenvalues
+\[
+    1 = \lambda_1 > \lambda_2 \ge \cdots \ge \lambda_n > -1.
+\]
+Let $S = U \Lambda U^\top$ be its eigendecomposition. Then
+\[
+    H^{(\ell)} = U \Lambda^\ell U^\top X \to u_1 u_1^\top X \quad \text{as } \ell \to \infty,
+\]
+where $u_1$ is the eigenvector of the largest eigenvalue. This means all node features become aligned with $u_1$: the representations collapse into a one-dimensional subspace. The rate of collapse is exponential,
+\[
+    \lVert S^\ell - u_1 u_1^\top \rVert_2 = \max_{i \ge 2} |\lambda_i|^\ell,
+\]
+so deeper layers quickly erase distinctions between nodes. Intuitively, repeated averaging acts as a low-pass filter on the graph: high-frequency variations across neighbors vanish, and all nodes converge to a similar state.
+
+\subsection{Mitigating oversmoothing}
+\textbf{Graph Isomorphism Networks (GIN).} Oversmoothing is tied to averaging. One way to reduce it is to use sum aggregation without degree normalization and then apply a powerful MLP:
+\[
+    h_v^{(\ell+1)} = \operatorname{MLP}^{(\ell)}\left((1 + \epsilon^{(\ell)}) h_v^{(\ell)} + \sum_{u \in N(v)} h_u^{(\ell)}\right).
+\]
+The sum preserves the multiset of neighbor features, and the MLP can learn a rich, injective transformation. This update can yield eigenvalues with magnitude greater than $1$ in the effective propagation operator, counteracting the exponential shrinkage that causes oversmoothing.
+
+\textbf{Laplace positional encodings.} Another strategy is to augment node features with \emph{spectral coordinates} that resist smoothing. Consider the eigenvectors of $S$ (or, equivalently, of the normalized graph Laplacian). The top eigenvector $u_1$ is the smoothest signal and dominates the limit of $S^\ell$, so we instead take the next $k$ eigenvectors $u_2, \ldots, u_{k+1}$ and append them to the input features:
+\[
+    X' = [X \mid u_2 \mid \cdots \mid u_{k+1} ].
+\]
+These eigenvectors are orthogonal to $u_1$ and correspond to directions that decay more slowly under $S^\ell$. As a result, they provide positional information that helps the model preserve structural differences across nodes even in deeper networks.
