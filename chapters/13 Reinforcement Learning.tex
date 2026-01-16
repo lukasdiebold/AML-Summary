@@ -1,3 +1,355 @@
 \section{Reinforcement Learning}
 
-\textit{Use the PDF from moodle for this chapter.}
+Reinforcement learning addresses the problem of learning to make sequential decisions through interaction with an environment. Unlike supervised learning, where we are given labeled examples, in reinforcement learning an agent must discover which actions lead to desirable outcomes by trying them and observing rewards. This chapter presents the mathematical foundations of reinforcement learning, beginning with the Markov decision process formalism and developing the key concepts of value functions, Bellman equations, and learning algorithms.
+
+\subsection{Agent-Environment Interaction Loop}
+
+Reinforcement learning is organized around repeated interaction. At time step $t$, the agent observes a state $s_t$ (often an observation $o_t$ in practice), selects an action $a_t$, receives a reward $r_t$, and the environment transitions to $s_{t+1}$. Episodes terminate when a goal is reached or a failure condition occurs. A typical training loop alternates between:
+\begin{itemize}
+\item \textbf{Generate samples:} roll out the current policy to collect trajectories.
+\item \textbf{Estimate performance:} compute returns or advantages from the collected data.
+\item \textbf{Update policy:} adjust parameters to improve expected return.
+\end{itemize}
+
+In practical RL libraries (e.g., Gymnasium), the interaction is standardized via \texttt{reset()} to start an episode and \texttt{step(action)} to advance the environment until it terminates or is truncated. Tasks vary in whether states and actions are discrete or continuous; tabular methods can handle small discrete spaces, while continuous or high-dimensional settings require function approximation, typically with neural networks.
+
+\subsection{Markov Decision Processes}
+
+We formalize the reinforcement learning problem using the framework of Markov decision processes (MDPs), which provide a mathematical model for sequential decision-making under uncertainty.
+
+\begin{definition}[Markov Decision Process]
+A Markov decision process is a tuple $(\mathcal{S}, \mathcal{A}, p, r, \rho_0, \gamma)$, where $\gamma \in (0,1]$, consisting of:
+\begin{itemize}
+\item $\mathcal{S}$: the state space (measurable space if continuous)
+\item $\mathcal{A}$: the action set (discrete or continuous)
+\item $p(\cdot \mid s, a)$: the transition kernel over $\mathcal{S}$
+\item $r(s, a, s') \in \mathbb{R}$: the reward function
+\item $\rho_0$: the initial-state distribution
+\item $\gamma$: the discount factor
+\end{itemize}
+\end{definition}
+
+The state space $\mathcal{S}$ describes all possible configurations of the environment. At each time step, the agent observes a state $s \in \mathcal{S}$, selects an action $a \in \mathcal{A}$, and the environment transitions to a new state $s'$ sampled from $p(\cdot \mid s, a)$, yielding reward $r(s, a, s')$.
+
+The discount factor $\gamma$ determines how the agent weighs future rewards relative to immediate rewards. When $\gamma$ is close to 0, the agent behaves myopically, prioritizing immediate rewards. When $\gamma$ approaches 1, future rewards are valued nearly as much as immediate ones. The discount factor also ensures that infinite sums of rewards remain bounded.
+
+\begin{notebox}
+In a partially observable MDP (POMDP), the agent does not observe the true state $s$ directly. Instead, it perceives an observation $o \sim \mathcal{O}(\cdot \mid s)$ drawn from an observation distribution. In a fully observable MDP, $o = s$ (full observability). We focus on fully observable MDPs throughout this chapter.
+\end{notebox}
+
+\subsection{Policies}
+
+A policy specifies the agent's behavior by mapping states to action distributions.
+
+\begin{definition}[Policy]
+A policy is a function $\pi$ that maps each state $s \in \mathcal{S}$ to a distribution over the action set $\pi(\cdot \mid s)$.
+\end{definition}
+
+We distinguish between two types of policies:
+\begin{itemize}
+\item \textbf{Deterministic}: $\mu : \mathcal{S} \to \mathcal{A}$, when $\pi(\cdot \mid s)$ has no randomness.
+\item \textbf{Stochastic}: $\pi(\cdot \mid s)$, otherwise.
+\end{itemize}
+
+A deterministic policy always selects the same action in a given state, while a stochastic policy may randomize. Stochastic policies are useful for exploration and, in some settings (such as games with simultaneous moves), may be necessary for optimality.
+
+\subsection{Trajectories and Returns}
+
+Given a policy $\pi$, the agent's interaction with the environment generates a trajectory:
+\begin{equation}
+\tau = (s_0, a_0, r_0, s_1, a_1, r_1, \ldots),
+\end{equation}
+where $s_0 \sim \rho_0$, $a_t \sim \pi(\cdot \mid s_t)$, $s_{t+1} \sim p(\cdot \mid s_t, a_t)$, and $r_t = r(s_t, a_t, s_{t+1})$.
+
+The discounted return from time $t$ is defined as:
+\begin{equation}
+G_t = \sum_{k=0}^{\infty} \gamma^k r_{t+k}.
+\end{equation}
+
+The return $G_t$ represents the total discounted reward accumulated from time $t$ onward. It is a random variable because future states, actions, and rewards are stochastic. The objective in reinforcement learning is to find a policy that maximizes the expected return.
+
+An important property of the return is that it satisfies a recursive decomposition:
+\begin{equation}
+G_t = r_t + \gamma G_{t+1}.
+\end{equation}
+This recursive structure is fundamental to the Bellman equations we will derive shortly.
+
+\subsection{The Markov Property}
+
+The MDP framework is built on the Markov property, which states that the next state depends only on the current state and action, not on the entire history:
+\begin{equation}
+\mathbb{P}(s_{t+1} \mid s_{0:t}, a_{0:t}) = \mathbb{P}(s_{t+1} \mid s_t, a_t).
+\end{equation}
+
+This property has two important consequences:
+\begin{itemize}
+\item The current state-action pair $(s_t, a_t)$ is a sufficient statistic for predicting the future. We do not need to track the entire history of states and actions.
+\item The Markov property enables dynamic programming and Bellman recursion. Because the future depends only on the present, we can express long-term values recursively in terms of immediate rewards and future values.
+\end{itemize}
+
+The Markov property is what makes many reinforcement learning algorithms tractable. Without it, we would need to condition on arbitrarily long histories, making the problem combinatorially complex.
+
+\subsection{Value Functions}
+
+To evaluate policies, we define value functions that measure the expected return from a given state or state-action pair.
+
+\begin{definition}[Value Functions]
+For a policy $\pi$, we define:
+\begin{align}
+V^\pi(s) &= \mathbb{E}_\pi[G \mid s], \\
+Q^\pi(s, a) &= \mathbb{E}_\pi[G \mid s, a],
+\end{align}
+where the expectation is taken over trajectories generated by following policy $\pi$.
+\end{definition}
+
+The state-value function $V^\pi(s)$ gives the expected return starting from state $s$ and following policy $\pi$. The action-value function $Q^\pi(s, a)$ gives the expected return starting from state $s$, taking action $a$, and then following policy $\pi$.
+
+For discrete action spaces, these two value functions are related by:
+\begin{equation}
+V^\pi(s) = \sum_{a} \pi(a \mid s) Q^\pi(s, a).
+\end{equation}
+
+The intuition is simple: the value of a state under policy $\pi$ is the expected Q-value of actions drawn from $\pi$. If we know all the Q-values, we can compute the state-value by averaging over the policy's action distribution.
+
+\subsection{Bellman Equations}
+
+The Bellman equations express value functions recursively, exploiting the Markov property to relate values at one time step to values at the next.
+
+\subsubsection{Policy Evaluation}
+
+For a fixed policy $\pi$, the value functions satisfy the following Bellman expectation equations:
+
+\begin{align}
+V^\pi(s) &= \sum_{a} \pi(a \mid s) \sum_{s'} p(s' \mid s, a) \left(r(s, a, s') + \gamma V^\pi(s')\right), \label{eq:bellman_v} \\
+Q^\pi(s, a) &= \sum_{s'} p(s' \mid s, a) \left(r(s, a, s') + \gamma \sum_{a'} \pi(a' \mid s') Q^\pi(s', a')\right). \label{eq:bellman_q}
+\end{align}
+
+\begin{derivation}
+We derive equation \eqref{eq:bellman_v}. Starting from the definition of $V^\pi$ and using the recursive structure of the return:
+\begin{align*}
+V^\pi(s) &= \mathbb{E}_\pi[G_t \mid s_t = s] \\
+&= \mathbb{E}_\pi[r_t + \gamma G_{t+1} \mid s_t = s] \\
+&= \mathbb{E}_\pi[r_t \mid s_t = s] + \gamma \mathbb{E}_\pi[G_{t+1} \mid s_t = s].
+\end{align*}
+
+The first term involves averaging over actions drawn from $\pi(\cdot \mid s)$ and next states from $p(\cdot \mid s, a)$:
+\begin{equation*}
+\mathbb{E}_\pi[r_t \mid s_t = s] = \sum_{a} \pi(a \mid s) \sum_{s'} p(s' \mid s, a) r(s, a, s').
+\end{equation*}
+
+For the second term, we use the law of total expectation and the Markov property:
+\begin{align*}
+\mathbb{E}_\pi[G_{t+1} \mid s_t = s] &= \sum_{a} \pi(a \mid s) \sum_{s'} p(s' \mid s, a) \mathbb{E}_\pi[G_{t+1} \mid s_{t+1} = s'] \\
+&= \sum_{a} \pi(a \mid s) \sum_{s'} p(s' \mid s, a) V^\pi(s').
+\end{align*}
+
+Combining these results yields equation \eqref{eq:bellman_v}. The derivation of equation \eqref{eq:bellman_q} follows a similar structure.
+\end{derivation}
+
+These equations express the value of a state (or state-action pair) in terms of immediate rewards and the values of successor states. They form a system of linear equations that can be solved to find $V^\pi$ or $Q^\pi$ for a given policy $\pi$---a process called policy evaluation.
+
+\subsubsection{Optimality}
+
+Rather than evaluating a specific policy, we often seek an optimal policy that maximizes expected return from every state. The optimal value functions are:
+\begin{align}
+V^*(s) &= \max_{a} \sum_{s'} p(s' \mid s, a) \left(r(s, a, s') + \gamma V^*(s')\right), \\
+Q^*(s, a) &= \sum_{s'} p(s' \mid s, a) \left(r(s, a, s') + \gamma \max_{a'} Q^*(s', a')\right).
+\end{align}
+
+These are the Bellman optimality equations. Unlike the Bellman expectation equations, which average over the policy's action distribution, the optimality equations maximize over actions. The optimal value of a state is achieved by taking the best action from that state.
+
+Once we have computed $Q^*$, we can extract an optimal policy by acting greedily:
+\begin{equation}
+\pi^*(s) = \arg\max_{a} Q^*(s, a).
+\end{equation}
+
+Because $Q^*(s, a)$ already accounts for optimal future behavior, selecting the action with the highest Q-value in each state yields an optimal policy.
+
+\subsection{Exploration versus Exploitation}
+
+A central challenge in reinforcement learning is balancing exploration and exploitation. To learn accurate value estimates, the agent must explore different actions to discover their consequences. However, to maximize reward, the agent should exploit its current knowledge by selecting actions it believes to be best. These objectives are in conflict.
+
+The goal is to maximize expected return while reducing uncertainty. Several strategies address this trade-off:
+
+\paragraph{$\epsilon$-Greedy.} With probability $\epsilon$, the agent selects a random action uniformly from $\mathcal{A}$. With probability $1-\epsilon$, it acts greedily: $\arg\max_a Q(s, a)$. This ensures sufficient exploration while still exploiting good actions most of the time.
+
+\paragraph{Softmax/Boltzmann.} The agent samples actions according to a Boltzmann distribution:
+\begin{equation}
+\pi(a \mid s) \propto e^{Q(s,a)/\tau},
+\end{equation}
+where $\tau > 0$ is a temperature parameter. Large $\tau$ yields nearly uniform exploration, while small $\tau$ concentrates probability on the greedy action.
+
+\paragraph{Annealing.} Both $\epsilon$ and $\tau$ are typically annealed over time---gradually decreased as learning progresses. Early in training, high exploration helps discover good actions. Later, exploitation of learned knowledge becomes more valuable.
+
+\subsection{Q-Learning}
+
+Q-learning is a fundamental algorithm that learns the optimal action-value function $Q^*$ from experience, without requiring a model of the environment's dynamics.
+
+\subsubsection{The Update Rule}
+
+Q-learning is an off-policy temporal-difference learning algorithm. After observing a transition $(s_t, a_t, r_t, s_{t+1})$, Q-learning updates the Q-value estimate:
+\begin{equation}
+Q(s_t, a_t) \leftarrow Q(s_t, a_t) + \alpha \left[r_t + \gamma \max_{a'} Q(s_{t+1}, a') - Q(s_t, a_t)\right],
+\end{equation}
+where $\alpha$ is the learning rate.
+
+The quantity in brackets is the temporal-difference (TD) error. It measures the discrepancy between the current Q-value estimate $Q(s_t, a_t)$ and a target value $r_t + \gamma \max_{a'} Q(s_{t+1}, a')$ formed from the immediate reward and the best Q-value in the next state.
+
+\begin{derivation}
+The update is motivated by the Bellman optimality equation for $Q^*$:
+\begin{equation*}
+Q^*(s, a) = \mathbb{E}_{s' \sim p(\cdot \mid s,a)}\left[r(s, a, s') + \gamma \max_{a'} Q^*(s', a')\right].
+\end{equation*}
+
+Given a sample transition $(s, a, r, s')$, the quantity $r + \gamma \max_{a'} Q(s', a')$ is a sampled estimate of the right-hand side. If our current estimate $Q(s, a)$ is accurate, this sample should approximately equal $Q(s, a)$. The TD error measures the discrepancy, and we use it to adjust $Q(s, a)$ toward the target.
+
+Over many updates, this stochastic approximation procedure converges to $Q^*$ under appropriate conditions (every state-action pair visited infinitely often, suitable learning rate schedule, bounded rewards).
+\end{derivation}
+
+\begin{notebox}
+Q-learning is off-policy: the update uses $\max_{a'} Q(s_{t+1}, a')$, corresponding to the greedy action in the next state, regardless of which action is actually taken. This decoupling allows the agent to learn about the optimal policy while following an exploratory behavior policy (such as $\epsilon$-greedy).
+\end{notebox}
+
+Q-learning is practical in small, discrete state-action spaces where we can maintain a table of Q-values. For each state-action pair $(s, a)$, we store an estimate $Q(s, a)$ and update it whenever we observe a transition starting from $(s, a)$.
+
+\subsection{Deep Q-Networks (DQN)}
+
+Tabular Q-learning becomes infeasible when the state or action spaces are large or continuous. Deep Q-Networks (DQN) address this limitation through function approximation.
+
+\subsubsection{Function Approximation}
+
+DQN approximates $Q_\theta(s, a)$ with a multilayer perceptron (MLP), where $\theta$ denotes the network parameters. The network takes a state $s$ as input and outputs Q-values for all actions.
+
+Training involves minimizing the squared temporal-difference error. Given a transition $(s, a, r, s')$, the loss is:
+\begin{equation}
+L(\theta) = \left(r + \gamma \max_{a'} Q_\theta(s', a') - Q_\theta(s, a)\right)^2.
+\end{equation}
+
+Naively minimizing this loss is unstable because the target $r + \gamma \max_{a'} Q_\theta(s', a')$ depends on the parameters $\theta$ being optimized. DQN introduces two key innovations to stabilize training:
+
+\paragraph{Target Network.} DQN maintains a separate target network with parameters $\theta^-$, which is updated less frequently than the online network $\theta$. The loss uses the target network for computing target Q-values:
+\begin{equation}
+L(\theta) = \left(r + \gamma \max_{a'} Q_{\theta^-}(s', a') - Q_\theta(s, a)\right)^2.
+\end{equation}
+
+By keeping $\theta^-$ fixed for many gradient steps, the targets remain stable, reducing oscillations and divergence. Periodically, $\theta^-$ is updated to match $\theta$.
+
+\paragraph{Replay Buffer.} Instead of learning from transitions in the order they occur, DQN stores transitions in a replay buffer and samples mini-batches uniformly for training.
+
+This decorrelates consecutive transitions, which would otherwise exhibit strong temporal correlation and cause the network to overfit to recent experiences. Replay also improves data efficiency: each transition can be used for multiple gradient updates.
+
+\subsubsection{The DQN Algorithm}
+
+The complete DQN algorithm proceeds as follows:
+\begin{enumerate}
+\item Initialize replay buffer and network parameters $\theta, \theta^-$
+\item For each episode:
+\begin{itemize}
+\item Observe initial state $s_0$
+\item For time steps $t = 0, 1, 2, \ldots$:
+\begin{enumerate}
+\item Select action using $\epsilon$-greedy based on $Q_\theta(s_t, \cdot)$
+\item Execute action, observe reward $r_t$ and next state $s_{t+1}$
+\item Store transition $(s_t, a_t, r_t, s_{t+1})$ in replay buffer
+\item Sample random mini-batch from replay buffer
+\item Compute targets using $\theta^-$ and update $\theta$ by gradient descent on squared TD error
+\item Periodically update $\theta^- \leftarrow \theta$
+\end{enumerate}
+\end{itemize}
+\end{enumerate}
+
+DQN demonstrated that deep reinforcement learning could achieve human-level performance on complex tasks such as Atari games, learning directly from raw pixel inputs. This success established neural network function approximation as a viable approach for scaling reinforcement learning to high-dimensional state spaces.
+
+\subsection{Policy-Based Methods and Policy Gradients}
+
+Value-based methods learn $V^\pi$ or $Q^\pi$ and then derive a policy. Policy-based methods instead optimize a parameterized policy $\pi_\theta(a \mid s)$ directly. This is especially attractive for continuous actions, where we can model $\pi_\theta$ with a Gaussian distribution whose mean and log-standard-deviation are produced by a neural network, and for discrete actions, where a softmax parameterization is typical.
+
+\subsubsection{Objective and Policy Gradient}
+
+Let $\tau = (s_0, a_0, r_0, s_1, \ldots)$ denote a trajectory and $p_\theta(\tau)$ the distribution over trajectories induced by $\pi_\theta$. The standard objective is the expected discounted return:
+\begin{equation}
+J(\theta) = \mathbb{E}_{\tau \sim p_\theta}\left[G_0\right], \qquad G_0 = \sum_{t=0}^{T} \gamma^t r_t.
+\end{equation}
+Using the log-derivative trick, the gradient can be written as:
+\begin{equation}
+\nabla_\theta J(\theta) = \mathbb{E}_{\tau \sim p_\theta} \left[\sum_{t=0}^{T} \nabla_\theta \log \pi_\theta(a_t \mid s_t) G_0\right].
+\end{equation}
+This expression forms the basis of policy gradient algorithms.
+
+\subsubsection{REINFORCE}
+
+REINFORCE uses Monte Carlo rollouts to estimate the policy gradient. Given a batch of trajectories $\mathcal{D}$, a common surrogate loss is:
+\begin{equation}
+L^{\text{PG}}(\theta) = -\frac{1}{|\mathcal{D}|} \sum_{i=1}^{|\mathcal{D}|} \sum_{t=0}^{T} \log \pi_\theta(a_t^i \mid s_t^i) \, G_t^i,
+\end{equation}
+where $G_t$ is the reward-to-go:
+\begin{equation}
+G_t = \sum_{t' = t}^{T} \gamma^{t' - t} r_{t'}.
+\end{equation}
+Using $G_t$ instead of $G_0$ respects causality (actions do not influence past rewards) and typically reduces variance.
+
+\paragraph{Return normalization.} In practice, it is common to normalize $G_t$ (or advantages) by subtracting the batch mean and dividing by the batch standard deviation. This keeps gradient magnitudes stable across epochs and reduces sensitivity to reward scale.
+
+\begin{notebox}
+REINFORCE alternates between collecting rollouts with the current policy and updating $\theta$ using the sample-based loss. The resulting policy remains stochastic during training to maintain exploration, while deployment often uses a deterministic action (e.g., the mean action of a Gaussian policy).
+\end{notebox}
+
+\subsection{Actor-Critic Methods}
+
+REINFORCE can suffer from high-variance gradient estimates. Actor-critic methods reduce variance by introducing a learned baseline (the critic) to compute advantages. The critic approximates the state-value function $V_\phi(s)$ and is trained via regression:
+\begin{equation}
+L^V(\phi) = \mathbb{E}\left[(V_\phi(s_t) - G_t)^2\right].
+\end{equation}
+The actor is updated with an advantage estimate:
+\begin{equation}
+L^{\text{A2C}}(\theta) = -\mathbb{E}\left[\log \pi_\theta(a_t \mid s_t) \, A_t\right], \qquad A_t = G_t - V_\phi(s_t).
+\end{equation}
+Updating the critic multiple times per batch is common, as the critic can be optimized as a supervised learning problem.
+
+\subsubsection{Temporal-Difference Advantages}
+
+Using the full return $G_t$ yields low bias but high variance. Temporal-difference (TD) advantages reduce variance by bootstrapping:
+\begin{equation}
+\delta_t = r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t),
+\end{equation}
+\begin{equation}
+A_t^{\text{TD}} = \delta_t, \qquad A_t^{(n)} = \sum_{k=0}^{n-1} \gamma^k r_{t+k} + \gamma^n V_\phi(s_{t+n}) - V_\phi(s_t).
+\end{equation}
+These $n$-step estimators provide a bias-variance tradeoff between MC returns and pure TD.
+
+\subsubsection{Generalized Advantage Estimation (GAE)}
+
+GAE averages $n$-step estimators with an exponential weighting:
+\begin{equation}
+A_t^{\text{GAE}} = \sum_{l=0}^{T-t-1} (\gamma \lambda)^l \delta_{t+l}.
+\end{equation}
+The parameter $\lambda \in [0,1]$ controls the bias-variance tradeoff; $\lambda \to 1$ approaches Monte Carlo, while $\lambda \to 0$ approaches TD.
+
+\subsection{Proximal Policy Optimization (PPO)}
+
+Actor-critic methods typically update the policy once per batch of on-policy data. PPO improves sample efficiency by reusing data with an importance ratio:
+\begin{equation}
+w_t(\theta) = \frac{\pi_\theta(a_t \mid s_t)}{\pi_{\theta_{\text{old}}}(a_t \mid s_t)}.
+\end{equation}
+To prevent overly large updates, PPO uses a clipped surrogate objective:
+\begin{equation}
+L^{\text{CLIP}}(\theta) = -\mathbb{E}\left[\min\left(w_t A_t, \text{clip}(w_t, 1-\epsilon, 1+\epsilon) A_t\right)\right].
+\end{equation}
+Clipping limits the improvement of good actions and the degradation of bad actions, stabilizing training while allowing multiple gradient steps on the same batch.
+
+\subsection{Entropy Regularization}
+
+To encourage exploration, many policy-gradient methods add an entropy bonus:
+\begin{equation}
+H(\pi_\theta) = \mathbb{E}_{s_t, a_t \sim \pi_\theta}\left[-\log \pi_\theta(a_t \mid s_t)\right].
+\end{equation}
+When minimizing a loss, the entropy term is typically subtracted: $L_{\text{total}} = L_{\text{policy}} + c_V L^V - c_H H(\pi_\theta)$ with $c_H > 0$. This discourages premature collapse to overly deterministic policies.
+
+\subsection{Practical Training Notes}
+
+Several implementation details strongly affect performance:
+\begin{itemize}
+\item \textbf{Stochastic vs. deterministic evaluation:} stochastic policies are used for exploration during training, while a deterministic policy (e.g., the mean action) is often evaluated at test time for repeatability.
+\item \textbf{Normalization:} normalizing returns or advantages stabilizes gradients and improves learning speed.
+\item \textbf{Data collection vs. updates:} on-policy methods must gather new data after policy updates, while PPO balances this requirement with multiple updates on recent data.
+\end{itemize}

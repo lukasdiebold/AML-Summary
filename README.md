@@ -41,7 +41,4 @@ missing intuition, please open an issue or reach out with suggestions. If you wa
 
 ## TODO
 
-- [ ] Write chapter 10 Neural Networks.
-- [ ] Write chapter 11 Transformers.
-- [ ] Write chapter 12 Graph Neural Networks.
-- [ ] Write chapter 14 Reinforcement Learning.
+- [ ] Write chapter on Diffusion
