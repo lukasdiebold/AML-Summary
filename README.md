@@ -40,5 +40,3 @@ Feedback and corrections are welcome. If you spot mistakes, unclear passages, or
 missing intuition, please open an issue or reach out with suggestions. If you want to contribute, create an issue so everyone knows what you're working on. Pick a TODO from below or just pick you favorite chapter and improve it.
 
 ## TODO
-
-- [ ] Write chapter on Diffusion
